@@ -1,0 +1,15 @@
+table DimDate
+
+	column Date
+		dataType: dateTime
+		summarizeBy: none
+
+	column Month
+		dataType: string
+		summarizeBy: none
+
+	partition DimDate = entity
+		mode: directLake
+		source
+			entityName: DimDate
+			schemaName: dbo

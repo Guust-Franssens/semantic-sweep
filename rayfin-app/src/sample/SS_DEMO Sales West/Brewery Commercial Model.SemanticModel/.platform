@@ -1,0 +1,11 @@
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+    "metadata": {
+        "type": "SemanticModel",
+        "displayName": "Brewery Commercial Model"
+    },
+    "config": {
+        "version": "2.0",
+        "logicalId": "e5d298e7-6312-4b3d-b898-34ae3b9f4c0c"
+    }
+}

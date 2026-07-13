@@ -1,0 +1,23 @@
+table _Measures
+
+	column _dummy
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: [_dummy]
+
+	measure 'Total Volume (HL)' = SUM(FactSales[VolumeHL])
+		formatString: #,0
+
+	measure 'Volume YoY %' = DIVIDE([Total Volume (HL)] - CALCULATE([Total Volume (HL)], SAMEPERIODLASTYEAR(DimDate[Date])), CALCULATE([Total Volume (HL)], SAMEPERIODLASTYEAR(DimDate[Date])))
+		formatString: #,0
+
+	measure 'Brand Count' = DISTINCTCOUNT(DimBrand[Brand])
+		formatString: #,0
+
+	measure 'Distribution Points' = COUNTROWS(DimMarket)
+		formatString: #,0
+
+	partition _Measures = calculated
+		mode: import
+		source = Row("_dummy", BLANK())

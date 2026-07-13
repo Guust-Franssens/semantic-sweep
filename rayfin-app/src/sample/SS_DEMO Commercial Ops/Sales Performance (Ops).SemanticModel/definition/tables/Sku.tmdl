@@ -1,0 +1,19 @@
+table Sku
+
+	column SkuKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: SkuKey
+
+	column Sku
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Sku
+
+	partition Sku = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [SkuKey = Int64.Type, Sku = text], {{1, "Stella"}})
+			in
+				Source

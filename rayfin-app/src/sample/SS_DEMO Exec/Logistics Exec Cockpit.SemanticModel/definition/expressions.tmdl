@@ -1,0 +1,13 @@
+expression DatabaseQuery = ```
+		let
+			Source = AnalysisServices.Databases("pbiazure://api.powerbi.com/v1.0/myorg/SS_DEMO Logistics", [TypedConnectorSupport = null]),
+			Workspace = Source{[Name = "SS_DEMO Logistics"]}[Data],
+			Dataset = Workspace{[Name = "Logistics Cost Model"]}[Data]
+		in
+			Dataset
+		```
+	lineageTag: 8f2c1b4a-6d3e-4a7b-9c05-11e2f3a4b5c6
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table

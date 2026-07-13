@@ -1,0 +1,3 @@
+relationship r0
+	fromColumn: FactShipments.WarehouseKey
+	toColumn: DimWarehouse.WarehouseKey

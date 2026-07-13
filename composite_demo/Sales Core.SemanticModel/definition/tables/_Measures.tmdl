@@ -1,0 +1,26 @@
+table _Measures
+
+	column _dummy
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: [_dummy]
+
+	measure 'Total Volume (HL)' = SUM(FactSales[VolumeHL])
+		formatString: #,0
+
+	measure 'Net Revenue' = SUM(FactSales[NetRevenue])
+		formatString: #,0
+
+	measure 'Total Discount' = SUM(FactSales[Discount])
+		formatString: #,0
+
+	measure 'Gross Revenue' = SUM(FactSales[NetRevenue]) + SUM(FactSales[Discount])
+		formatString: #,0
+
+	measure 'Avg Revenue per HL' = DIVIDE(SUM(FactSales[NetRevenue]), SUM(FactSales[VolumeHL]))
+		formatString: #,0
+
+	partition _Measures = calculated
+		mode: import
+		source = Row("_dummy", BLANK())

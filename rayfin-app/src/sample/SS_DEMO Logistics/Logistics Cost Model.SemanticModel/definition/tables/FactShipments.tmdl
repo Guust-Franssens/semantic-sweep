@@ -1,0 +1,34 @@
+table FactShipments
+
+	column ShipDate
+		dataType: dateTime
+		summarizeBy: none
+		sourceColumn: ShipDate
+
+	column WarehouseKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: WarehouseKey
+
+	column Cost
+		dataType: double
+		summarizeBy: sum
+		sourceColumn: Cost
+
+	column WeightKg
+		dataType: double
+		summarizeBy: sum
+		sourceColumn: WeightKg
+
+	column Shipments
+		dataType: int64
+		summarizeBy: sum
+		sourceColumn: Shipments
+
+	partition FactShipments = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [ShipDate = date, WarehouseKey = Int64.Type, Cost = number, WeightKg = number, Shipments = Int64.Type], {{#date(2024,1,1), 1, 5400.0, 12500.0, 42}})
+			in
+				Source

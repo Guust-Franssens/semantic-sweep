@@ -1,0 +1,32 @@
+table _Measures
+
+	column _dummy
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: [_dummy]
+
+	measure 'Total Volume (HL)' = ROUND(SUM(FactSales[VolumeHL]), 0)
+		formatString: #,0
+
+	measure 'Net Revenue' = ROUND(SUM(FactSales[NetRevenue]), 0)
+		formatString: #,0
+
+	measure 'Volume LY' = CALCULATE([Total Volume (HL)], SAMEPERIODLASTYEAR(DimDate[Date]))
+		formatString: #,0
+
+	measure 'Net Revenue LY' = CALCULATE([Net Revenue], SAMEPERIODLASTYEAR(DimDate[Date]))
+		formatString: #,0
+
+	measure 'Volume YoY %' = DIVIDE([Total Volume (HL)] - [Volume LY], [Volume LY])
+		formatString: #,0
+
+	measure 'Avg Revenue per HL' = DIVIDE([Net Revenue], [Total Volume (HL)])
+		formatString: #,0
+
+	measure 'Discount %' = DIVIDE(SUM(FactSales[Discount]), [Net Revenue])
+		formatString: #,0
+
+	partition _Measures = calculated
+		mode: import
+		source = Row("_dummy", BLANK())

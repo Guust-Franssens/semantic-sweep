@@ -1,0 +1,15 @@
+table Calendar
+
+	column Date
+		dataType: dateTime
+		summarizeBy: none
+
+	column Month
+		dataType: string
+		summarizeBy: none
+
+	partition Calendar = entity
+		mode: directLake
+		source
+			entityName: Calendar
+			schemaName: dbo

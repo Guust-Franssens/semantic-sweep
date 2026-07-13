@@ -1,0 +1,7 @@
+relationship rel_0
+	fromColumn: FactShipments.WarehouseKey
+	toColumn: DimWarehouse.WarehouseKey
+
+relationship rel_1
+	fromColumn: FactShipments.ShipDate
+	toColumn: DimDate.Date

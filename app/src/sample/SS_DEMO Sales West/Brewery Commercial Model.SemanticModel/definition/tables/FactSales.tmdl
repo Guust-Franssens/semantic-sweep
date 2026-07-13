@@ -1,0 +1,39 @@
+table FactSales
+
+	column OrderDate
+		dataType: dateTime
+		summarizeBy: none
+		sourceColumn: OrderDate
+
+	column BrandKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: BrandKey
+
+	column MarketKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: MarketKey
+
+	column VolumeHL
+		dataType: double
+		summarizeBy: none
+		sourceColumn: VolumeHL
+
+	column NetRevenue
+		dataType: double
+		summarizeBy: none
+		sourceColumn: NetRevenue
+
+	column Discount
+		dataType: double
+		summarizeBy: none
+		sourceColumn: Discount
+
+	partition FactSales = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [OrderDate = date, BrandKey = Int64.Type, MarketKey = Int64.Type, VolumeHL = number, NetRevenue = number, Discount = number], {{#date(2024,1,1), 1, 10, 1250.0, 84000.0, 3200.0}})
+			in
+				Source

@@ -1,0 +1,15 @@
+table DimWarehouse
+
+	column WarehouseKey
+		dataType: int64
+		summarizeBy: none
+
+	column Region
+		dataType: string
+		summarizeBy: none
+
+	partition DimWarehouse = entity
+		mode: directLake
+		source
+			entityName: DimWarehouse
+			schemaName: dbo

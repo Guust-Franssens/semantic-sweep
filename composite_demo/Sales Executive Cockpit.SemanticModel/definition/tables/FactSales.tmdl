@@ -1,0 +1,36 @@
+table FactSales
+
+	column OrderDate
+		dataType: dateTime
+		summarizeBy: none
+		sourceColumn: OrderDate
+
+	column BrandKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: BrandKey
+
+	column VolumeHL
+		dataType: double
+		summarizeBy: none
+		sourceColumn: VolumeHL
+
+	column NetRevenue
+		dataType: double
+		summarizeBy: none
+		sourceColumn: NetRevenue
+
+	column Discount
+		dataType: double
+		summarizeBy: none
+		sourceColumn: Discount
+
+	partition FactSales = m
+		mode: directQuery
+		source =
+			let
+				Source = AnalysisServices.Databases("pbiazure://api.powerbi.com/v1.0/myorg/6d5fb940-a069-4324-857b-51d0fe6818bb"),
+				Db = Source{[Name = "Sales Core"]}[Data],
+				Data = Db{[Name = "FactSales", Kind = "Table"]}[Data]
+			in
+				Data

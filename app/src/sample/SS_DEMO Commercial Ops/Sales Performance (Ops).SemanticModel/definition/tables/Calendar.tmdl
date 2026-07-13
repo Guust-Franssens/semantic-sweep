@@ -1,0 +1,24 @@
+table Calendar
+
+	column Date
+		dataType: dateTime
+		summarizeBy: none
+		sourceColumn: Date
+
+	column Month
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Month
+
+	column Year
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: Year
+
+	partition Calendar = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [Date = date, Month = text, Year = Int64.Type], {{#date(2024,1,1), "Jan", 2024}})
+			in
+				Source

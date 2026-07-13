@@ -1,0 +1,32 @@
+table _Measures
+
+	column _dummy
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: [_dummy]
+
+	measure 'Total Cost' = SUM(FactShipments[Cost])
+		formatString: #,0
+
+	measure 'Shipment Count' = COUNTROWS(FactShipments)
+		formatString: #,0
+
+	measure 'Avg Weight (Kg)' = AVERAGE(FactShipments[WeightKg])
+		formatString: #,0
+
+	measure 'Max Shipment Cost' = MAX(FactShipments[Cost])
+		formatString: #,0
+
+	measure 'Cost per Kg' = DIVIDE(SUM(FactShipments[Cost]), SUM(FactShipments[WeightKg]))
+		formatString: #,0
+
+	measure 'On-Time Rate' = DIVIDE(CALCULATE(COUNTROWS(FactShipments), FactShipments[Cost] > 0), COUNTROWS(FactShipments))
+		formatString: #,0.0%
+
+	measure 'Cost vs Target %' = DIVIDE([Total Cost] - 5000000, 5000000)
+		formatString: #,0
+
+	partition _Measures = calculated
+		mode: import
+		source = Row("_dummy", BLANK())

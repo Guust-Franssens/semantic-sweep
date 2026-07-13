@@ -1,0 +1,22 @@
+table DimDate
+
+	column Date
+		dataType: dateTime
+		summarizeBy: none
+		sourceColumn: Date
+
+	column Year
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: Year
+
+	column MonthName
+		dataType: string
+		summarizeBy: none
+		sourceColumn: MonthName
+
+	partition DimDate = entity
+		mode: directQuery
+		source
+			entityName: DimDate
+			expressionSource: DatabaseQuery

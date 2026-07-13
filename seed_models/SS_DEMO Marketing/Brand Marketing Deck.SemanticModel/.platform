@@ -1,0 +1,11 @@
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+    "metadata": {
+        "type": "SemanticModel",
+        "displayName": "Brand Marketing Deck"
+    },
+    "config": {
+        "version": "2.0",
+        "logicalId": "71df06a6-c5eb-49c1-aa55-57874910f886"
+    }
+}

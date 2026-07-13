@@ -1,0 +1,47 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Real tenant metadata + run outputs — never commit
+models/
+out/
+inventory.json
+export_results.json
+seed_manifest.json
+
+# Secrets + customer-confidential context — never commit
+.env
+.env.*
+*.local
+abi-martech-context/
+plan.md
+*.pbix
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / Vite app
+app/node_modules/
+app/dist/
+
+# Rayfin Fabric App
+rayfin-app/node_modules/
+rayfin-app/dist/
+rayfin-app/.env*
+rayfin-app/rayfin/.env
+rayfin-app/rayfin/.deployments.json
+rayfin-app/rayfin/.lockfile.json
+rayfin-app/rayfin/.temp/
+rayfin-app/*.tsbuildinfo
+
+# Generic build artifacts (any nested project)
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo

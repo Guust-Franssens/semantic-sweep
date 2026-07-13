@@ -1,0 +1,19 @@
+table FactShipments
+
+	column ShipDate
+		dataType: dateTime
+		summarizeBy: none
+
+	column WarehouseKey
+		dataType: int64
+		summarizeBy: none
+
+	column OnTime
+		dataType: int64
+		summarizeBy: none
+
+	partition FactShipments = entity
+		mode: directLake
+		source
+			entityName: FactShipments
+			schemaName: dbo

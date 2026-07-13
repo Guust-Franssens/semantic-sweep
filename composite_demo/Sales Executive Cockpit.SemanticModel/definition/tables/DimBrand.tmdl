@@ -1,0 +1,21 @@
+table DimBrand
+
+	column BrandKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: BrandKey
+
+	column Brand
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Brand
+
+	partition DimBrand = m
+		mode: directQuery
+		source =
+			let
+				Source = AnalysisServices.Databases("pbiazure://api.powerbi.com/v1.0/myorg/6d5fb940-a069-4324-857b-51d0fe6818bb"),
+				Db = Source{[Name = "Sales Core"]}[Data],
+				Data = Db{[Name = "DimBrand", Kind = "Table"]}[Data]
+			in
+				Data

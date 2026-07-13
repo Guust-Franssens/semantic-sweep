@@ -1,0 +1,24 @@
+table DimMarket
+
+	column MarketKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: MarketKey
+
+	column Market
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Market
+
+	column Region
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Region
+
+	partition DimMarket = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [MarketKey = Int64.Type, Market = text, Region = text], {{10, "Belgium", "EMEA"}})
+			in
+				Source

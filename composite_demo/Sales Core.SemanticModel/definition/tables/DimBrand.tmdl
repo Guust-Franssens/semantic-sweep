@@ -1,0 +1,19 @@
+table DimBrand
+
+	column BrandKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: BrandKey
+
+	column Brand
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Brand
+
+	partition DimBrand = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [BrandKey = Int64.Type, Brand = text], {{1, "Stella"}})
+			in
+				Source

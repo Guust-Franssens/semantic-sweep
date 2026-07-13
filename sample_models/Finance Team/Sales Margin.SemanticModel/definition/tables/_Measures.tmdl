@@ -1,0 +1,13 @@
+table _Measures
+
+	measure 'Total Sales' = SUM(FactSales[Amount])
+		formatString: 0
+
+	measure 'Total Cost' = SUM(FactSales[Cost])
+		formatString: 0
+
+	measure 'Margin' = [Total Sales] - [Total Cost]
+		formatString: 0
+
+	measure 'Margin %' = DIVIDE([Margin], [Total Sales])
+		formatString: 0

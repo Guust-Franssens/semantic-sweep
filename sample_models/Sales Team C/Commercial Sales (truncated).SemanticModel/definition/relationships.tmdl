@@ -1,0 +1,7 @@
+relationship r0
+	fromColumn: FactSales.ProductKey
+	toColumn: DimProduct.ProductKey
+
+relationship r1
+	fromColumn: FactSales.OrderDate
+	toColumn: DimDate.Date

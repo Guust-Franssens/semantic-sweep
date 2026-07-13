@@ -1,0 +1,26 @@
+table _Measures
+
+	column _dummy
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: [_dummy]
+
+	measure 'Total Volume (HL)' = TRUNC(SUM(FactSales[VolumeHL]))
+		formatString: #,0
+
+	measure 'Net Revenue' = SUM(FactSales[NetRevenue])
+		formatString: #,0
+
+	measure 'Volume LY' = CALCULATE([Total Volume (HL)], SAMEPERIODLASTYEAR(DimDate[Date]))
+		formatString: #,0
+
+	measure 'Net Revenue LY' = CALCULATE([Net Revenue], SAMEPERIODLASTYEAR(DimDate[Date]))
+		formatString: #,0
+
+	measure 'Volume YoY %' = DIVIDE([Total Volume (HL)] - [Volume LY], [Volume LY])
+		formatString: #,0
+
+	partition _Measures = calculated
+		mode: import
+		source = Row("_dummy", BLANK())

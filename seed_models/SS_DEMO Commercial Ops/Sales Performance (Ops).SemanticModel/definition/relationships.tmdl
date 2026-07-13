@@ -1,0 +1,7 @@
+relationship rel_0
+	fromColumn: Sales.SkuKey
+	toColumn: Sku.SkuKey
+
+relationship rel_1
+	fromColumn: Sales.OrderDate
+	toColumn: Calendar.Date

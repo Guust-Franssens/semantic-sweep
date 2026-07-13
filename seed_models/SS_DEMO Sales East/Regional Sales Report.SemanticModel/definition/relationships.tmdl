@@ -1,0 +1,11 @@
+relationship rel_0
+	fromColumn: FactSales.BrandKey
+	toColumn: DimBrand.BrandKey
+
+relationship rel_1
+	fromColumn: FactSales.OrderDate
+	toColumn: DimDate.Date
+
+relationship rel_2
+	fromColumn: FactSales.MarketKey
+	toColumn: DimMarket.MarketKey

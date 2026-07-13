@@ -1,0 +1,7 @@
+table _Measures
+
+	measure 'Shipment Count' = COUNTROWS(FactShipments)
+		formatString: 0
+
+	measure 'On-Time %' = DIVIDE(CALCULATE(COUNTROWS(FactShipments), FactShipments[OnTime] = 1), [Shipment Count])
+		formatString: 0

@@ -1,0 +1,11 @@
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+    "metadata": {
+        "type": "SemanticModel",
+        "displayName": "Sales Executive Cockpit"
+    },
+    "config": {
+        "version": "2.0",
+        "logicalId": "8c6c24ee-a311-44ed-8c73-3d9a9be4e6bc"
+    }
+}

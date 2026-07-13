@@ -1,0 +1,79 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/* FabricAtlas-style Fluent design tokens. Tailwind utilities (bg-card, text-muted-foreground,
+   border-border, bg-primary, …) resolve to these so the shell matches FabricAtlas. */
+@theme {
+  --color-background: #f5f6f8;
+  --color-foreground: #1b1f24;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #1b1f24;
+
+  --color-primary: #0f6cbd;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #eef1f4;
+  --color-secondary-foreground: #1b1f24;
+
+  --color-muted: #eef1f4;
+  --color-muted-foreground: #5f6b76;
+
+  --color-accent: #e9eef3;
+  --color-accent-foreground: #1b1f24;
+
+  --color-destructive: #c50f1f;
+  --color-success: #0e700e;
+  --color-warning: #bc4b09;
+
+  --color-border: #e2e6ea;
+  --color-input: #e2e6ea;
+  --color-ring: #0f6cbd;
+
+  --font-sans: 'Segoe UI', 'Segoe UI Web (West European)', Aptos, -apple-system,
+    BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: Consolas, 'Courier New', Courier, monospace;
+}
+
+@layer base {
+  .dark {
+    --color-background: #1b1a19;
+    --color-foreground: #f3f2f1;
+
+    --color-card: #262524;
+    --color-card-foreground: #f3f2f1;
+
+    --color-primary: #479ef5;
+    --color-primary-foreground: #0a1626;
+
+    --color-secondary: #232322;
+    --color-secondary-foreground: #f3f2f1;
+
+    --color-muted: #232322;
+    --color-muted-foreground: #a19f9d;
+
+    --color-accent: #333231;
+    --color-accent-foreground: #f3f2f1;
+
+    --color-border: #3d3b39;
+    --color-input: #3d3b39;
+    --color-ring: #479ef5;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
