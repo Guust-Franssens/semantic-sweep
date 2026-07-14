@@ -1,19 +1,95 @@
-# semantic-sweep
+<div align="center">
 
-Scan a Power BI **semantic-model estate** and automatically flag **near-duplicate models**, as
-decision support for consolidation. Built to tackle a real-world "duplicate semantic models"
-problem across a large Power BI estate.
+# 🧭 semantic-sweep
 
-## What it does
+### Find duplicate Power BI semantic models across your whole estate — in one place.
+
+Scan every model in a Microsoft Fabric / Power BI tenant, score the near-duplicates with
+**transparent evidence**, and get ranked, human-in-the-loop consolidation calls.
+The scoring engine runs **entirely in your browser**; ships as a
+[Rayfin](https://github.com/microsoft/rayfin) Fabric App with Entra SSO.
+
+</div>
+
+<!-- DEMO VIDEO ↓  paste the https://github.com/user-attachments/assets/… URL on its own line here -->
+
+---
+
+## What is semantic-sweep?
+
+A Power BI estate sprawls. The same "Sales" model gets copied across teams, promoted
+dev → test → prod, and rebuilt from the same source by three different people. Nobody can see which
+models are genuinely duplicated, which are just lifecycle copies, and which are safe to retire.
+
+semantic-sweep gives you that picture. Point it at your estate and it reads every semantic model,
+scores **all model pairs** on a multi-facet similarity — measures + DAX, schema, source and
+relationships — then separates the real duplicates from promotion chains and shared-source
+coincidences, with the **evidence for every call**.
+
+> **Decision support, not auto-deletion.** semantic-sweep ranks and explains; a human confirms.
+
+## A tour
+
+### Estate overview
+One glance: models scanned, pairs scored, duplicate clusters, retirement candidates — and the top
+consolidation candidates ranked by evidence band (exact clone → strong duplicate → subset → needs review).
+
+![Estate overview](docs/screenshots/overview.png)
+
+### Consolidation worklist
+Every cross-team duplicate as a ranked, evidence-backed call — **keep** vs **retire / redirect** — with
+the specific conflict (measure logic differs, data types differ), a confidence score, and one-click CSV export.
+
+![Consolidation worklist](docs/screenshots/consolidation-worklist.png)
+
+### Why are these similar?
+No black box. Click any pair for the **facet breakdown** — measures, schema, logical/physical source,
+relationships — and the exact **matched measures** that drove the score.
+
+![Why are these similar](docs/screenshots/why-evidence.png)
+
+### Duplicate clusters, kept apart from lifecycle
+Genuine cross-team duplicates are grouped into clusters and held **separate from promotion chains**
+(dev → test → prod copies of one model), so a healthy pipeline never gets flagged for "consolidation".
+
+![Duplicate clusters](docs/screenshots/duplicate-clusters.png)
+
+### Facet scoring & review
+The full pair table — score, band, and per-facet measure/schema contribution — for related and
+needs-review pairs, plus promotion chains and the excluded system-generated buckets.
+
+![Facet scores](docs/screenshots/facet-scores.png)
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+  EST["Fabric estate"] -->|"fab export · TMDL"| PARSE["Parse to ModelCard<br/>tables · columns<br/>measures + DAX · relationships · source"]
+  PARSE --> SCORE["Score every pair<br/>measures · schema<br/>source · relationships"]
+  SCORE --> SEP{"Separate the signal"}
+  SEP --> DUP["Organic duplicates<br/>the real wins"]
+  SEP --> PROMO["Promotion chains<br/>dev to test to prod"]
+  SEP --> REV["Related / needs-review"]
+
+  classDef est fill:#0ea5b7,stroke:#0f766e,color:#fff;
+  classDef proc fill:#3b82f6,stroke:#1e40af,color:#fff;
+  classDef dup fill:#22a565,stroke:#15803d,color:#fff;
+  class EST est;
+  class PARSE,SCORE proc;
+  class DUP dup;
+```
+
 1. **Inventory + extract** every semantic model in a Fabric tenant to TMDL (`scripts/`).
-2. **Parse** each model to a `ModelCard` (tables, columns, measures + DAX, relationships, source).
-3. **Score** every pair with a multi-facet similarity (measures + schema + logical/physical source
-   + relationships), using **weighted lexical DAX features** (not opaque embeddings).
-4. **Separate the signal types** into three views:
-   - **Promotion chains** — dev/test/prod copies of the same model (+ drift), *not* consolidation
-     targets.
+2. **Parse** each model to a `ModelCard` — tables, columns, measures + DAX, relationships, source.
+3. **Score** every pair with a multi-facet similarity, using **weighted lexical DAX features**
+   (transparent, not opaque embeddings).
+4. **Separate the signal types** so you act on the right thing:
    - **Organic duplicate candidates** — genuine cross-team duplication (the real wins).
+   - **Promotion chains** — dev/test/prod copies of one model (+ drift), *not* consolidation targets.
    - **Related / needs-review** — shared source only, or mixed evidence.
+
    System-generated models (Usage Metrics, default lakehouse models) are bucketed separately.
 
 ## Usage
@@ -50,7 +126,8 @@ npm install
 npm run validate    # confirm TS engine == Python engine on ../models
 npm run build       # -> app/dist/index.html (single self-contained file)
 ```
-Promotable to a **Rayfin Fabric App** later (managed hosting + Entra SSO) — same frontend shape.
+Also shipped as a **Rayfin Fabric App** (`rayfin-app/`) — managed hosting + Entra SSO for live,
+in-tenant estate scans (that's the app shown in the tour above).
 
 ## Layout
 ```
