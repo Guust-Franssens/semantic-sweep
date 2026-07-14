@@ -11,7 +11,7 @@ The scoring engine runs **entirely in your browser**; ships as a
 
 </div>
 
-<!-- DEMO VIDEO ↓  paste the https://github.com/user-attachments/assets/… URL on its own line here -->
+https://github.com/user-attachments/assets/8668590a-1156-490a-a32c-dffef5405afc
 
 ---
 
