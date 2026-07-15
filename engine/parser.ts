@@ -46,9 +46,16 @@ function readMeasure(lines: string[], start: number): [Measure, number] {
     }
     i += 1;
   } else if (inline === "") {
+    // The exporter emits a leading whitespace-only line before the body, so a blank line is part of
+    // the expression block, not its terminator. Stop only at the first non-blank line shallow enough
+    // to be a child property (indent + 1) or a sibling/parent (<= indent).
     while (i < lines.length) {
       const cur = lines[i];
-      if (cur.trim() === "" || tabIndent(cur) <= indent + 1) break;
+      if (cur.trim() === "") {
+        i += 1;
+        continue;
+      }
+      if (tabIndent(cur) <= indent + 1) break;
       parts.push(cur.trim());
       i += 1;
     }

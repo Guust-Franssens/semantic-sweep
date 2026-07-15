@@ -90,24 +90,37 @@ def _read_measure(lines: list[str], i: int) -> tuple[Measure, int]:
     line = lines[i]
     indent = _tab_indent(line)
     match = re.match(r"^\t+measure\s+(.+?)\s*=\s*(.*)$", line)
-    name = _unquote(match.group(1))
-    inline = match.group(2).strip()
     parts: list[str] = []
-    i += 1
-    if inline == "```":  # triple-backtick fenced multi-line expression
-        while i < len(lines) and lines[i].strip() != "```":
-            parts.append(lines[i].strip())
-            i += 1
-        i += 1  # consume closing fence
-    elif inline == "":  # `=` on its own line: DAX continues at a deeper indent
-        while i < len(lines):
-            cur = lines[i]
-            if cur.strip() == "" or _tab_indent(cur) <= indent + 1:
-                break
-            parts.append(cur.strip())
-            i += 1
-    else:  # single-line measure
-        parts.append(inline)
+    if match is None:
+        # A blank/placeholder measure declared with no `= expression` on the line (e.g. a
+        # freshly-added `measure Medida` that carries only child properties). Real estates contain
+        # these, so treat it as an empty measure instead of crashing the whole scan.
+        name = _unquote(re.sub(r"^\t+measure\s+", "", line).strip())
+        i += 1
+    else:
+        name = _unquote(match.group(1))
+        inline = match.group(2).strip()
+        i += 1
+        if inline == "```":  # triple-backtick fenced multi-line expression
+            while i < len(lines) and lines[i].strip() != "```":
+                parts.append(lines[i].strip())
+                i += 1
+            i += 1  # consume closing fence
+        elif inline == "":  # `=` on its own line: DAX continues at a deeper indent
+            # The exporter emits a leading whitespace-only line before the body, so a blank line is
+            # part of the expression block, not its terminator. Stop only at the first non-blank line
+            # shallow enough to be a child property (indent + 1) or a sibling/parent (<= indent).
+            while i < len(lines):
+                cur = lines[i]
+                if cur.strip() == "":
+                    i += 1
+                    continue
+                if _tab_indent(cur) <= indent + 1:
+                    break
+                parts.append(cur.strip())
+                i += 1
+        else:  # single-line measure
+            parts.append(inline)
     # Skip the measure's child property lines (formatString, displayFolder, kpi, ...).
     while i < len(lines):
         cur = lines[i]

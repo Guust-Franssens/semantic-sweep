@@ -35,6 +35,7 @@ app/dist/
 rayfin-app/node_modules/
 rayfin-app/dist/
 rayfin-app/.env*
+!rayfin-app/.env.example
 rayfin-app/rayfin/.env
 rayfin-app/rayfin/.deployments.json
 rayfin-app/rayfin/.lockfile.json
