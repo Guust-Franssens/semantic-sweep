@@ -4,6 +4,7 @@ import { fabricModelUrl, modelId } from "@engine/types";
 import { REC_LABELS, SHOWS_SAVINGS } from "@engine/recommend";
 import { downloadCsv, recsToCsv } from "./csv";
 import { BAND_META, bandColor, bandLabel } from "./bands";
+import { diffDax, type DiffToken } from "./daxDiff";
 import { useFocusTrap } from "./hooks/useFocusTrap";
 
 export const Pill = ({ band }: { band: string }) => (
@@ -518,6 +519,24 @@ interface DrawerProps {
   onClose: () => void;
 }
 
+// Renders one side of a token-level DAX diff. Whitespace tokens never get a highlight (a colored gap
+// reads as noise); only changed identifiers/operators light up red (left/removed) or green (right/added).
+function DaxDiffPre({ tokens }: { tokens: DiffToken[] }) {
+  return (
+    <pre>
+      {tokens.map((t, i) =>
+        t.kind === "same" || !t.text.trim() ? (
+          <span key={i}>{t.text}</span>
+        ) : (
+          <span key={i} className={t.kind === "removed" ? "dax-del" : "dax-add"}>
+            {t.text}
+          </span>
+        ),
+      )}
+    </pre>
+  );
+}
+
 export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
   const daxA = new Map(pair.a.measures.map((m) => [m.name, m.dax]));
   const daxB = new Map(pair.b.measures.map((m) => [m.name, m.dax]));
@@ -585,19 +604,25 @@ export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
 
         {drift.length > 0 && (
           <div style={{ marginTop: 14 }}>
-            <div className="tag">DAX differences (matched but not identical)</div>
-            {drift.slice(0, 6).map((m, i) => (
-              <div key={i}>
-                <div style={{ fontSize: 12, margin: "8px 0 2px" }}>
-                  <code>{m.a}</code> {m.a !== m.b && <>vs <code>{m.b}</code></>}{" "}
-                  <span className="tag">({m.score.toFixed(2)})</span>
+            <div className="tag">
+              DAX differences (matched but not identical): <span className="dax-del">red</span> = only on the left,{" "}
+              <span className="dax-add">green</span> = only on the right.
+            </div>
+            {drift.slice(0, 6).map((m, i) => {
+              const d = diffDax(daxA.get(m.a) ?? "", daxB.get(m.b) ?? "");
+              return (
+                <div key={i}>
+                  <div style={{ fontSize: 12, margin: "8px 0 2px" }}>
+                    <code>{m.a}</code> {m.a !== m.b && <>vs <code>{m.b}</code></>}{" "}
+                    <span className="tag">({m.score.toFixed(2)})</span>
+                  </div>
+                  <div className="daxdiff">
+                    <DaxDiffPre tokens={d.a} />
+                    <DaxDiffPre tokens={d.b} />
+                  </div>
                 </div>
-                <div className="daxdiff">
-                  <pre>{daxA.get(m.a) ?? "N/A"}</pre>
-                  <pre>{daxB.get(m.b) ?? "N/A"}</pre>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

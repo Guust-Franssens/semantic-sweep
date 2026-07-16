@@ -115,6 +115,8 @@ table.heatmap th.corner { position: sticky; left: 0; background: var(--cp-surfac
 .mm-row.drift { color: var(--cp-warning); }
 .daxdiff { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 12px; }
 .daxdiff pre { background: var(--cp-surface); border: 1px solid var(--cp-border); border-radius: 8px; padding: 8px; font-size: 11px; margin: 0; overflow: auto; white-space: pre-wrap; }
+.dax-del { background: color-mix(in srgb, var(--cp-danger) 20%, transparent); border-radius: 3px; padding: 0 1px; }
+.dax-add { background: color-mix(in srgb, var(--cp-success) 22%, transparent); border-radius: 3px; padding: 0 1px; }
 .tag { font-size: 11px; color: var(--cp-text-muted); }
 footer { margin-top: 40px; color: var(--cp-text-soft); font-size: 12px; border-top: 1px solid var(--cp-border); padding-top: 12px; }
 
