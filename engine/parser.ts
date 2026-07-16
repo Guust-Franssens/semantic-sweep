@@ -50,7 +50,13 @@ const GENERIC_PARAM_NAMES = new Set([
   "port", "endpoint", "source", "db", "path", "filepath", "file", "url", "connection", "conn",
 ]);
 // Composite / DirectQuery-to-Power-BI-dataset reference: a model built ON another semantic model.
-const ANALYSIS_SERVICES_RE = /AnalysisServices\.Databases?\(\s*"([^"]*)"(?:\s*,\s*"([^"]+)")?/gi;
+// Both args reuse ARG_SRC so a parameterized call (e.g. `AnalysisServices.Database(serverURL, "")`
+// where `serverURL` is an M query parameter — a real pattern in Microsoft's own FUAM toolkit exports)
+// still matches; a literal-only regex silently fails on this common templated-connection idiom.
+const ANALYSIS_SERVICES_RE = new RegExp(
+  String.raw`\bAnalysisServices\.Databases?\(\s*` + ARG_SRC + String.raw`(?:\s*,\s*` + ARG_SRC + `)?`,
+  "gi",
+);
 // Fabric/PBI DirectQuery-to-dataset via the dedicated connector (e.g. PowerBIDatasets / PowerPlatform.Dataflows-style).
 const PBI_DATASETS_RE = /PowerBIDatasets\s*\(/i;
 // M navigation step `{[Name="DatasetName"]}[Data]` — how the upstream dataset name appears when it
@@ -306,11 +312,18 @@ function parseModel(mf: ModelFiles): ModelCard {
     const navNames = [...f.text.matchAll(NAV_NAME_RE)].map((n) => n[1].trim());
     let fileHasComposite = false;
     for (const m of f.text.matchAll(ANALYSIS_SERVICES_RE)) {
-      // A PBI/AS dataset endpoint => this is a composite model chained onto another dataset.
-      if (/pbiazure|powerbi|analysis\.windows\.net/i.test(m[1])) {
+      const endpoint = m[1] ?? m[2];
+      const endpointIsParam = m[1] === undefined;
+      const datasetLiteral = m[3];
+      // A literal endpoint is sanity-checked against the substring pattern (excludes traditional
+      // on-prem/Azure AS Tabular connections that reuse this same M function but aren't a
+      // composite-to-PBI-dataset link). A parameterized endpoint can't be inspected from static text
+      // alone, but AnalysisServices.Database(s) in an exported Power BI/Fabric model is overwhelmingly
+      // the composite-dataset feature, so accept it unconditionally rather than under-detecting.
+      if (endpoint && (endpointIsParam || /pbiazure|powerbi|analysis\.windows\.net/i.test(endpoint))) {
         compositeSeen = true;
         fileHasComposite = true;
-        if (m[2]) derived.add(m[2].trim());
+        if (datasetLiteral) derived.add(datasetLiteral.trim());
       }
     }
     if (PBI_DATASETS_RE.test(f.text)) {

@@ -41,12 +41,21 @@ export interface ScanResult {
 // Explicit "built on" links from composite / chained models (DirectQuery to another dataset) — a
 // high-confidence relationship, distinct from coincidental similarity.
 function computeCompositeLinks(cards: ModelCard[]): CompositeLink[] {
-  const byName = new Map<string, ModelCard>();
-  for (const c of cards) byName.set(c.name.trim().toLowerCase(), c);
+  const byName = new Map<string, ModelCard[]>();
+  for (const c of cards) {
+    const key = c.name.trim().toLowerCase();
+    const bucket = byName.get(key);
+    if (bucket) bucket.push(c);
+    else byName.set(key, [c]);
+  }
   const links: CompositeLink[] = [];
   for (const c of cards) {
     for (const up of c.derivedFrom ?? []) {
-      links.push({ from: c, toName: up, to: byName.get(up.trim().toLowerCase()) });
+      const matches = byName.get(up.trim().toLowerCase());
+      // Only resolve `to` when the name uniquely identifies one model in this scan. Two unrelated
+      // models sharing a name (e.g. cloned across workspaces) must not link to the wrong one —
+      // fall back to showing just the name (UI renders "source not in this scan").
+      links.push({ from: c, toName: up, to: matches?.length === 1 ? matches[0] : undefined });
     }
   }
   return links;

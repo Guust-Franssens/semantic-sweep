@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Layers,
+  Link2,
   type LucideIcon,
   Moon,
   RefreshCw,
@@ -235,7 +236,7 @@ function CompositeSection({ links, onModel }: { links: CompositeLink[]; onModel:
   if (links.length === 0) return null;
   return (
     <>
-      <h2 className="mb-[8px] mt-[26px] text-[15px] font-bold text-foreground">Composite &amp; derived models</h2>
+      <h2 className="mb-[8px] text-[15px] font-bold text-foreground">Composite &amp; derived models</h2>
       <p className="mb-[10px] text-[13px] text-muted-foreground">
         Models built on another dataset via <b>DirectQuery</b> — an explicit, intentional link (reuse of a shared/golden dataset), not a coincidental duplicate.
       </p>
@@ -537,6 +538,7 @@ export function SweepPage() {
     chains: scan.chains.length,
     systemGenerated: systemGenerated.length,
     review: scan.pairs.filter((p) => REVIEW_BANDS.includes(p.band)).length,
+    composite: scan.compositeLinks?.length ?? 0,
   };
 
   const toggleBand = (b: string): void =>
@@ -558,6 +560,9 @@ export function SweepPage() {
         <StatCard icon={Trash2} value={retire} label="Retirement candidates" tint="#0e700e" accent />
       ) : (
         <StatCard icon={GitBranch} value={s.chains} label="Promotion chains" tint="#8764b8" />
+      )}
+      {s.composite > 0 && (
+        <StatCard icon={Link2} value={s.composite} label="Composite / derived" sub="built on another dataset" tint="#8764b8" />
       )}
       <StatCard icon={Cog} value={s.systemGenerated} label="System-generated" tint="#5c6b78" />
       <StatCard icon={ClipboardList} value={s.review} label="Needs review" tint="#bc4b09" />
@@ -743,13 +748,16 @@ export function SweepPage() {
               {view === "review" && (
                 <>
                   <ViewHeader title="Review & lifecycle" subtitle="Related / needs-review pairs, dev→test→prod promotion chains, and the excluded buckets." />
-                  <h2 className="mb-[8px] text-[15px] font-bold text-foreground">Related / needs review</h2>
+                  {/* Composite/derived links are high-confidence, already-explained lineage — surfaced
+                      first so a reviewer can dismiss them before wading into the harder ambiguous pairs
+                      below, instead of being buried after the review table and promotion chains. */}
+                  <CompositeSection links={scan.compositeLinks ?? []} onModel={setModel} />
+                  <h2 className="mb-[8px] mt-[26px] text-[15px] font-bold text-foreground">Related / needs review</h2>
                   <Toolbar bands={REVIEW_BANDS} active={activeBands} onToggle={toggleBand} search={search} onSearch={setSearch} />
                   <ReviewTable pairs={reviewPairs} labels={labels} onWhy={setWhy} />
                   <h2 className="mb-[8px] mt-[26px] text-[15px] font-bold text-foreground">Promotion chains (dev / test / prod)</h2>
                   <p className="mb-[10px] text-[13px] text-muted-foreground">Same model promoted across environments — expected, not a consolidation target. Drift = numbers may differ across stages.</p>
                   <Chains chains={scan.chains} labels={labels} />
-                  <CompositeSection links={scan.compositeLinks ?? []} onModel={setModel} />
                   <h2 className="mb-[8px] mt-[26px] text-[15px] font-bold text-foreground">Excluded buckets</h2>
                   <Buckets systemGenerated={systemGenerated} emptyModels={scan.emptyModels} excludedDupes={excludedSystemDupes} labels={labels} onWhy={setWhy} />
                 </>

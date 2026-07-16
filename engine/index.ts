@@ -39,9 +39,19 @@ const qualifiedColumns = (c: ModelCard): Set<string> =>
 
 // True when one model is a composite/DirectQuery layer built directly on the other (its derivedFrom
 // names the other model). That shared schema/measures is expected lineage, not organic duplication.
-function isCompositeParentChild(a: ModelCard, b: ModelCard): boolean {
+// `cards`, when supplied (scoreAll has full scan visibility), guards against a name-ambiguous
+// suppression: if two unrelated models happen to share a name (e.g. cloned across workspaces), a
+// derivedFrom match by name alone must not suppress cluster/duplicate evidence for the wrong model.
+function isCompositeParentChild(a: ModelCard, b: ModelCard, cards?: ModelCard[]): boolean {
+  const nameIsUnique = (name: string): boolean => {
+    if (!cards) return true;
+    const norm = name.trim().toLowerCase();
+    return cards.filter((c) => c.name.trim().toLowerCase() === norm).length === 1;
+  };
   const names = (c: ModelCard, other: ModelCard): boolean =>
-    (c.derivedFrom ?? []).some((n) => n.trim().toLowerCase() === other.name.trim().toLowerCase());
+    (c.derivedFrom ?? []).some(
+      (n) => n.trim().toLowerCase() === other.name.trim().toLowerCase() && nameIsUnique(n),
+    );
   return names(a, b) || names(b, a);
 }
 
@@ -95,7 +105,7 @@ function warnings(a: ModelCard, b: ModelCard, physical: number): string[] {
   return notes;
 }
 
-export function scorePair(a: ModelCard, b: ModelCard): PairResult {
+export function scorePair(a: ModelCard, b: ModelCard, cards?: ModelCard[]): PairResult {
   const measure = matchModelMeasures(a.measures, b.measures);
   const facets = {
     measure: measure.similarity,
@@ -113,14 +123,14 @@ export function scorePair(a: ModelCard, b: ModelCard): PairResult {
     facets.measure, measure.containment, facets.schema, facets.source_logical, headline, measure.strongMatched,
   );
   const lifecycle = isLifecycleCandidate(a, b) && facets.measure >= LIFECYCLE_MEASURE;
-  const composite = isCompositeParentChild(a, b);
+  const composite = isCompositeParentChild(a, b, cards);
   return { a, b, facets, headline, band, lifecycle, composite, measure, warnings: warnings(a, b, facets.source_physical) };
 }
 
 export function scoreAll(cards: ModelCard[]): PairResult[] {
   const results: PairResult[] = [];
   for (let i = 0; i < cards.length; i++) {
-    for (let j = i + 1; j < cards.length; j++) results.push(scorePair(cards[i], cards[j]));
+    for (let j = i + 1; j < cards.length; j++) results.push(scorePair(cards[i], cards[j], cards));
   }
   results.sort((x, y) => y.headline - x.headline);
   return results;
