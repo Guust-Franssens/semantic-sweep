@@ -4,6 +4,7 @@ import { fabricModelUrl, modelId } from "@engine/types";
 import { REC_LABELS, SHOWS_SAVINGS } from "@engine/recommend";
 import { downloadCsv, recsToCsv } from "./csv";
 import { BAND_META, bandColor, bandLabel } from "./bands";
+import { useFocusTrap } from "./hooks/useFocusTrap";
 
 export const Pill = ({ band }: { band: string }) => (
   <span className="pill" style={{ background: bandColor(band) }}>
@@ -430,13 +431,14 @@ export function ModelDrawer({ card, pairs, labels, onClose, onOpenPair }: ModelD
     .sort((a, b) => b.headline - a.headline)
     .slice(0, 8);
   const other = (p: PairResult): ModelCard => (p.a === card ? p.b : p.a);
+  const drawerRef = useFocusTrap<HTMLDivElement>(onClose);
   return (
     <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()}>
+      <div className="drawer" ref={drawerRef} role="dialog" aria-modal="true" aria-labelledby="model-drawer-title" onClick={(e) => e.stopPropagation()}>
         <button className="btn close" onClick={onClose}>
           ✕ close
         </button>
-        <h3>{card.name}</h3>
+        <h3 id="model-drawer-title">{card.name}</h3>
         <div className="muted" style={{ marginBottom: 10 }}>{card.workspace}</div>
         {fabricModelUrl(card) && (
           <a
@@ -507,14 +509,15 @@ export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
   const daxA = new Map(pair.a.measures.map((m) => [m.name, m.dax]));
   const daxB = new Map(pair.b.measures.map((m) => [m.name, m.dax]));
   const drift = pair.measure.matched.filter((m) => m.score < 0.999);
+  const drawerRef = useFocusTrap<HTMLDivElement>(onClose);
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()}>
+      <div className="drawer" ref={drawerRef} role="dialog" aria-modal="true" aria-labelledby="why-drawer-title" onClick={(e) => e.stopPropagation()}>
         <button className="btn close" onClick={onClose}>
           ✕ close
         </button>
-        <h3>Why are these similar?</h3>
+        <h3 id="why-drawer-title">Why are these similar?</h3>
         <div className="muted" style={{ marginBottom: 10 }}>
           {labels.get(modelId(pair.a))} &nbsp;~&nbsp; {labels.get(modelId(pair.b))}
         </div>
@@ -526,7 +529,14 @@ export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
         {FACET_LABELS.map(([key, label]) => (
           <div className="facet-row" key={key}>
             <span>{label}</span>
-            <span className="bar">
+            <span
+              className="bar"
+              role="progressbar"
+              aria-label={label}
+              aria-valuenow={Math.round(pair.facets[key] * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
               <span style={{ width: `${pair.facets[key] * 100}%` }} />
             </span>
             <span className="mono">{pair.facets[key].toFixed(2)}</span>

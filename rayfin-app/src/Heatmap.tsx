@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import type { ModelCard, PairResult } from "@engine/types";
 import { modelId } from "@engine/types";
-import { bandLabel } from "./bands";
+import { bandLabel, bandRgbTable } from "./bands";
 
 interface Props {
   cards: ModelCard[];
@@ -58,6 +58,9 @@ export function Heatmap({ cards, pairs, labels, onSelect, onModel }: Props) {
     const border = cs.getPropertyValue("--cp-border").trim() || "#e5e7eb";
     const softbg = cs.getPropertyValue("--cp-surface-soft").trim() || "#f3f4f6";
     const muted = cs.getPropertyValue("--cp-text-muted").trim() || "#6b7280";
+    // Per-band hue so identity (exact clone vs related-source, etc.) reads at a glance instead of
+    // just headline-score opacity of a single accent color — matches the legend shown above the grid.
+    const rgbByBand = bandRgbTable(canvas);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
@@ -73,8 +76,9 @@ export function Heatmap({ cards, pairs, labels, onSelect, onModel }: Props) {
         }
         const p = pairAt(r, c);
         const score = p ? p.headline : 0;
-        if (score > 0) {
-          ctx.fillStyle = `rgba(${accentRgb}, ${0.08 + 0.92 * score})`;
+        if (p && score > 0) {
+          const rgb = rgbByBand[p.band] ?? rgbByBand.unrelated ?? accentRgb;
+          ctx.fillStyle = `rgba(${rgb}, ${0.08 + 0.92 * score})`;
           ctx.fillRect(x, y, cell, cell);
         }
       }
@@ -162,6 +166,59 @@ export function Heatmap({ cards, pairs, labels, onSelect, onModel }: Props) {
     if (h?.p) onSelect(h.p);
   }
 
+  // Cell-center position in the same CSS-px space `locate()` uses for mouse hover, so keyboard
+  // focus reuses the existing crosshair/tooltip rendering without a parallel code path.
+  function hoverFor(r: number, c: number): Hover {
+    return { r, c, p: pairAt(r, c), x: gutter + c * cell + cell / 2, y: gutter + r * cell + cell / 2 };
+  }
+
+  function moveFocus(dr: number, dc: number): void {
+    if (n === 0) return;
+    const prev = hoverRef.current ?? { r: 0, c: n > 1 ? 1 : 0 };
+    let r = Math.min(n - 1, Math.max(0, prev.r + dr));
+    let c = Math.min(n - 1, Math.max(0, prev.c + dc));
+    // A model is never scored against itself — step one further in the direction of travel to
+    // hop over the diagonal instead of landing on a cell that can never have a pair.
+    if (r === c) {
+      if (dr !== 0) r = Math.min(n - 1, Math.max(0, r + dr));
+      else if (dc !== 0) c = Math.min(n - 1, Math.max(0, c + dc));
+    }
+    const h = hoverFor(r, c);
+    hoverRef.current = h;
+    setHover(h);
+    draw(h);
+  }
+
+  const KEY_MOVES: Record<string, [number, number]> = {
+    ArrowRight: [0, 1],
+    ArrowLeft: [0, -1],
+    ArrowDown: [1, 0],
+    ArrowUp: [-1, 0],
+  };
+
+  function onKeyDown(e: ReactKeyboardEvent<HTMLCanvasElement>): void {
+    const move = KEY_MOVES[e.key];
+    if (move) {
+      e.preventDefault();
+      moveFocus(move[0], move[1]);
+      return;
+    }
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (hoverRef.current?.p) onSelect(hoverRef.current.p);
+    }
+  }
+
+  // Text for the visually-hidden aria-live region — mirrors the mouse tooltip's content so keyboard
+  // and screen-reader users get the same row/column/band/score info sighted mouse users see.
+  function describeHover(h: Hover): string {
+    const rowName = labels.get(ids[h.r]) ?? codes[h.r];
+    const colName = labels.get(ids[h.c]) ?? codes[h.c];
+    const band = h.p ? bandLabel(h.p.band) : "Unrelated";
+    const score = (h.p ? h.p.headline : 0).toFixed(2);
+    return `${codes[h.r]} ${rowName} and ${codes[h.c]} ${colName}: ${band}, score ${score}.`;
+  }
+
   return (
     <div>
       <div className="heatmap-wrap">
@@ -170,9 +227,16 @@ export function Heatmap({ cards, pairs, labels, onSelect, onModel }: Props) {
             ref={canvasRef}
             width={size * dpr}
             height={size * dpr}
+            tabIndex={0}
+            role="img"
+            aria-label={`Model similarity heatmap, ${n} by ${n} models. Focus and use arrow keys to move between cells, Enter to inspect a pair. The focused cell is announced below.`}
+            aria-describedby="hm-live"
             style={{ width: size, height: size, cursor: hover?.p ? "pointer" : "default" }}
             onMouseMove={onMove}
             onMouseLeave={onLeave}
+            onFocus={() => moveFocus(0, 0)}
+            onBlur={onLeave}
+            onKeyDown={onKeyDown}
             onClick={onClick}
           />
           {hover && hover.r !== hover.c && (
@@ -191,6 +255,9 @@ export function Heatmap({ cards, pairs, labels, onSelect, onModel }: Props) {
               </div>
             </div>
           )}
+        </div>
+        <div id="hm-live" className="sr-only" aria-live="polite" aria-atomic="true">
+          {hover && hover.r !== hover.c ? describeHover(hover) : ""}
         </div>
       </div>
       <details className="tag">

@@ -198,7 +198,8 @@ export function App() {
         <Clusters clusters={scan.clusters} labels={labels} onWhy={setWhy} />
 
         <h2>Estate similarity map</h2>
-        <p className="sub">Every model vs every model; deeper blue = higher similarity. Click a cell for the “why”, or a model name for its detail.</p>
+        <p className="sub">Every model vs every model; color = band (see legend), depth = similarity score. Click a cell for the “why”, or a model name for its detail.</p>
+        <LegendBar />
         <Heatmap cards={scan.cards} pairs={scan.pairs} labels={labels} onSelect={setWhy} onModel={setModel} />
 
         <h2>Promotion chains (dev / test / prod)</h2>
@@ -238,7 +239,14 @@ export function App() {
         <div className="progress-overlay">
           <div className="progress-box">
             <strong>Scanning…</strong>
-            <div className="progress-track">
+            <div
+              className="progress-track"
+              role="progressbar"
+              aria-valuenow={pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={progress.label}
+            >
               <span style={{ width: `${pct}%` }} />
             </div>
             <div className="muted">{progress.label}</div>

@@ -100,6 +100,7 @@ table.heatmap th.corner { position: sticky; left: 0; background: var(--cp-surfac
 .hm-tip { position: absolute; pointer-events: none; z-index: 6; background: var(--cp-bg-elevated); border: 1px solid var(--cp-border); border-radius: 8px; padding: 6px 9px; font-size: 11px; line-height: 1.4; color: var(--cp-text); box-shadow: var(--cp-shadow); max-width: 240px; }
 .hm-tip strong { color: var(--cp-accent); font-family: ui-monospace, SFMono-Regular, monospace; margin-right: 3px; }
 .hm-tip-band { margin-top: 3px; color: var(--cp-text-muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 /* Drawer (why) */
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; justify-content: flex-end; z-index: 50; }

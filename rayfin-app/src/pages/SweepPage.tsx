@@ -61,6 +61,7 @@ import {
 import { isLocalBackend } from "../services/rayfinClient";
 import { fabricProvider, scanFabricEstate } from "../data/fabricScan";
 import { getFabricToken, signInToPbi } from "../data/fabricAuth";
+import { modeChipLabel } from "../scanModeLabels";
 import "../theme.css";
 
 const SEED_PREFIX = "SS_DEMO";
@@ -197,7 +198,7 @@ function SavedScansPanel({
               >
                 {s.label}
               </button>
-              <span className="rounded-md px-[6px] py-[1px] text-[10.5px] font-semibold uppercase" style={{ background: "#5c6b781f", color: "#5c6b78" }}>{s.mode}</span>
+              <span className="rounded-md px-[6px] py-[1px] text-[10.5px] font-semibold uppercase" style={{ background: "#5c6b781f", color: "#5c6b78" }}>{modeChipLabel(s.mode)}</span>
               {active && <span className="rounded-md px-[6px] py-[1px] text-[10.5px] font-semibold" style={{ background: "#0f6cbd1f", color: "#0f6cbd" }}>loaded</span>}
               {s.usageLoaded && <span className="rounded-md px-[6px] py-[1px] text-[10.5px] font-semibold" style={{ background: "#0e700e1f", color: "#0e700e" }}>usage</span>}
               <span className="text-muted-foreground">
@@ -208,6 +209,7 @@ function SavedScansPanel({
                 className="text-muted-foreground hover:text-[#a4262c]"
                 onClick={() => onDelete(s.id)}
                 title="Delete this saved scan"
+                aria-label={`Delete saved scan "${s.label}"`}
               >
                 <Trash2 size={14} />
               </button>
@@ -740,7 +742,8 @@ export function SweepPage() {
 
               {view === "map" && (
                 <>
-                  <ViewHeader title="Estate similarity map" subtitle="Every model vs every model; deeper blue = higher similarity. Click a cell for the “why”, or a model name for detail." />
+                  <ViewHeader title="Estate similarity map" subtitle="Every model vs every model; color = band (see legend), depth = similarity score. Click a cell for the “why”, or a model name for detail." />
+                  <LegendBar />
                   <Heatmap cards={scan.cards} pairs={scan.pairs} labels={labels} onSelect={setWhy} onModel={setModel} />
                 </>
               )}
@@ -808,7 +811,14 @@ export function SweepPage() {
         <div className="progress-overlay">
           <div className="progress-box">
             <strong>Scanning…</strong>
-            <div className="progress-track">
+            <div
+              className="progress-track"
+              role="progressbar"
+              aria-valuenow={pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={progress.label}
+            >
               <span style={{ width: `${pct}%` }} />
             </div>
             <div className="muted">{progress.label}</div>
