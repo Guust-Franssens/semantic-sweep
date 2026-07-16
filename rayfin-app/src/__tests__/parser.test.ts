@@ -47,3 +47,73 @@ describe("multi-line DAX parsing (leading blank line)", () => {
     expect(tot.dax).toBe("SUM(Sales[Amount])");
   });
 });
+
+// Source-parser broadening: the physical-source detector previously only recognized a literal-arg
+// `Sql.Database("host", "db")` and had no word boundary, so "PostgreSQL.Database(" / "MySQL.Database("
+// only worked by substring accident and BigQuery/Snowflake/Databricks/CSV/Parquet weren't recognized
+// at all. These pin down the broadened connector coverage and the parameterized-arg support.
+function modelWithExpression(expression: string): InputFile[] {
+  const text = `table Src\n\tpartition Src = m\n\t\tmode: import\n\t\tsource =\n\t\t\t\tlet\n\t\t\t\t\tSource = ${expression}\n\t\t\t\tin\n\t\t\t\t\tSource\n`;
+  return [{ path: "WS.Workspace/Src.SemanticModel/definition/tables/Src.tmdl", text }];
+}
+
+describe("source-physical parser broadening", () => {
+  const cardFor = (expression: string) => loadModelsFromFiles(modelWithExpression(expression), true)[0];
+
+  it("still recognizes literal Sql.Database (baseline, unchanged)", () => {
+    const card = cardFor('Sql.Database("prod-sql-01", "Sales")');
+    expect(card.sourcePhysical.has("prod-sql-01\u0000sales")).toBe(true);
+  });
+
+  it("recognizes PostgreSQL.Database without misreading it as a generic SQL Server match", () => {
+    const card = cardFor('PostgreSQL.Database("pg-host", "pgdb")');
+    expect(card.sourcePhysical.has("pg-host\u0000pgdb")).toBe(true);
+    expect(card.sourcePhysical.size).toBe(1); // no double-count from an unanchored "Sql.Database(" match
+  });
+
+  it("recognizes MySQL.Database (word-boundary fix must not drop this accidental-today coverage)", () => {
+    const card = cardFor('MySQL.Database("my-host", "mydb", [ReturnSingleDatabase=true])');
+    expect(card.sourcePhysical.has("my-host\u0000mydb")).toBe(true);
+  });
+
+  it("recognizes Snowflake.Databases", () => {
+    const card = cardFor('Snowflake.Databases("xy12345.snowflakecomputing.com", "COMPUTE_WH")');
+    expect(card.sourcePhysical.has("xy12345.snowflakecomputing.com\u0000compute_wh")).toBe(true);
+  });
+
+  it("recognizes Databricks.Catalogs", () => {
+    const card = cardFor('Databricks.Catalogs("adb-123.azuredatabricks.net", "/sql/1.0/warehouses/abc")');
+    expect(card.sourcePhysical.has("adb-123.azuredatabricks.net\u0000/sql/1.0/warehouses/abc")).toBe(true);
+  });
+
+  it("recognizes GoogleBigQuery.Database with a billing-project arg", () => {
+    const card = cardFor('GoogleBigQuery.Database("my-project-id")');
+    expect(card.sourcePhysical.has("my-project-id\u0000")).toBe(true);
+  });
+
+  it("does not fingerprint a zero-arg GoogleBigQuery.Database call", () => {
+    const card = cardFor("GoogleBigQuery.Database()");
+    expect(card.sourcePhysical.size).toBe(0);
+  });
+
+  it("recognizes Csv.Document(File.Contents(path))", () => {
+    const card = cardFor('Csv.Document(File.Contents("C:\\data\\sales.csv"), [Delimiter=","])');
+    expect(card.sourcePhysical.has("c:\\data\\sales.csv\u0000")).toBe(true);
+  });
+
+  it("recognizes Parquet.Document(File.Contents(path))", () => {
+    const card = cardFor('Parquet.Document(File.Contents("C:\\data\\sales.parquet"))');
+    expect(card.sourcePhysical.has("c:\\data\\sales.parquet\u0000")).toBe(true);
+  });
+
+  it("captures a parameterized Sql.Database(Server, Database) call symbolically", () => {
+    const card = cardFor("Sql.Database(ServerParam, DatabaseParam)");
+    expect(card.sourcePhysical.has("serverparam\u0000databaseparam")).toBe(true);
+  });
+
+  it("does not manufacture evidence from two unrelated models sharing only generic param names", () => {
+    const card = cardFor("Sql.Database(Server, Database)");
+    expect(card.sourcePhysical.size).toBe(0); // "Server"/"Database" alone are template placeholders, not evidence
+  });
+});
+

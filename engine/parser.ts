@@ -9,7 +9,46 @@ export interface InputFile {
 }
 
 const USAGE_METRICS_RE = /usage\s*metrics/i;
-const SQL_DATABASE_RE = /Sql\.Database\(\s*"([^"]+)"\s*,\s*"([^"]+)"/gi;
+// One connection arg: a literal string value, OR a bare identifier (an M query parameter / let-bound
+// name, e.g. `Sql.Database(ServerParam, DatabaseParam)`) captured symbolically so parameterized
+// connections still contribute comparable physical-source evidence instead of being silently dropped.
+const ARG_SRC = String.raw`(?:"([^"]+)"|(\w+))`;
+// `\b` matters here: without it "Sql.Database(" also matches inside "PostgreSQL.Database(" and
+// "MySQL.Database(" (both connector names literally end in "...SQL"), miscategorizing those sources
+// as SQL Server. PostgreSQL and MySQL get their own dedicated (and correctly `\b`-anchored) regexes
+// below so this fix doesn't silently drop coverage that previously worked only by substring accident.
+const SQL_DATABASE_RE = new RegExp(String.raw`\bSql\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC, "gi");
+const POSTGRESQL_RE = new RegExp(
+  String.raw`\bPostgreSQL\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC,
+  "gi",
+);
+const MYSQL_RE = new RegExp(String.raw`\bMySQL\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC, "gi");
+const SNOWFLAKE_RE = new RegExp(
+  String.raw`\bSnowflake\.Databases?\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC,
+  "gi",
+);
+const DATABRICKS_RE = new RegExp(
+  String.raw`\bDatabricks\.Catalogs\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC,
+  "gi",
+);
+// BigQuery rarely carries a comparable 2-arg identity (often zero args, or an options record); capture
+// a single literal/identifier arg (billing project) when present, else there's nothing to fingerprint.
+const BIGQUERY_RE = new RegExp(String.raw`\bGoogleBigQuery\.Database\(\s*` + ARG_SRC + "?", "gi");
+// File-based connectors: the file path is the physical identity. Only a simple literal path or a
+// single bare parameter reference is captured; a concatenation expression (e.g. folder & name &
+// ".csv") is dynamic per-row/per-parameter and cannot be fingerprinted statically.
+const CSV_RE = new RegExp(String.raw`\bCsv\.Document\(\s*File\.Contents\(\s*` + ARG_SRC + String.raw`\s*\)`, "gi");
+const PARQUET_RE = new RegExp(
+  String.raw`\bParquet\.Document\(\s*File\.Contents\(\s*` + ARG_SRC + String.raw`\s*\)`,
+  "gi",
+);
+// Bare M parameter names common enough in templated connection setups (e.g. every environment's model
+// has a query parameter literally called "Server"/"Database") that a shared PARAMETER NAME alone (not
+// an actual literal value) must not manufacture physical-source evidence between unrelated models.
+const GENERIC_PARAM_NAMES = new Set([
+  "server", "database", "host", "hostname", "warehouse", "instance", "catalog", "schema",
+  "port", "endpoint", "source", "db", "path", "filepath", "file", "url", "connection", "conn",
+]);
 // Composite / DirectQuery-to-Power-BI-dataset reference: a model built ON another semantic model.
 const ANALYSIS_SERVICES_RE = /AnalysisServices\.Databases?\(\s*"([^"]*)"(?:\s*,\s*"([^"]+)")?/gi;
 // Fabric/PBI DirectQuery-to-dataset via the dedicated connector (e.g. PowerBIDatasets / PowerPlatform.Dataflows-style).
@@ -190,6 +229,32 @@ function groupByModel(files: InputFile[]): ModelFiles[] {
   return [...groups.values()];
 }
 
+// Add a "server\u0000database"-shaped entry for every match of a 2-positional-arg connector regex
+// (Sql.Database, PostgreSQL.Database, Snowflake.Databases, Databricks.Catalogs all share this shape).
+function addTwoArgPhysicalSource(card: ModelCard, re: RegExp, text: string): void {
+  for (const m of text.matchAll(re)) {
+    const arg1 = m[1] ?? m[2];
+    const arg2 = m[3] ?? m[4];
+    if (!arg1 || !arg2) continue;
+    const bothParams = m[2] !== undefined && m[4] !== undefined;
+    if (bothParams && GENERIC_PARAM_NAMES.has(arg1.toLowerCase()) && GENERIC_PARAM_NAMES.has(arg2.toLowerCase())) {
+      continue; // templated parameter names alone are not comparable evidence
+    }
+    card.sourcePhysical.add(`${arg1.toLowerCase()}\u0000${arg2.toLowerCase()}`);
+  }
+}
+
+// Add a "value\u0000"-shaped entry (empty second component, matching the scanner's `db ?? ""`
+// convention) for a single-arg connector regex (BigQuery billing project, CSV/Parquet file path).
+function addSingleArgPhysicalSource(card: ModelCard, re: RegExp, text: string): void {
+  for (const m of text.matchAll(re)) {
+    const arg = m[1] ?? m[2];
+    if (!arg) continue;
+    if (m[2] !== undefined && GENERIC_PARAM_NAMES.has(arg.toLowerCase())) continue;
+    card.sourcePhysical.add(`${arg.toLowerCase()}\u0000`);
+  }
+}
+
 function parseModel(mf: ModelFiles): ModelCard {
   const card: ModelCard = {
     name: mf.name,
@@ -227,9 +292,14 @@ function parseModel(mf: ModelFiles): ModelCard {
   let compositeSeen = false;
   for (const f of defFiles) {
     if (!f.rel.endsWith(".tmdl")) continue;
-    for (const m of f.text.matchAll(SQL_DATABASE_RE)) {
-      card.sourcePhysical.add(`${m[1].toLowerCase()}\u0000${m[2].toLowerCase()}`);
-    }
+    addTwoArgPhysicalSource(card, SQL_DATABASE_RE, f.text);
+    addTwoArgPhysicalSource(card, POSTGRESQL_RE, f.text);
+    addTwoArgPhysicalSource(card, MYSQL_RE, f.text);
+    addTwoArgPhysicalSource(card, SNOWFLAKE_RE, f.text);
+    addTwoArgPhysicalSource(card, DATABRICKS_RE, f.text);
+    addSingleArgPhysicalSource(card, BIGQUERY_RE, f.text);
+    addSingleArgPhysicalSource(card, CSV_RE, f.text);
+    addSingleArgPhysicalSource(card, PARQUET_RE, f.text);
     // Collect M navigation names once per file; the deepest (last) nav is the queried dataset.
     const navNames = [...f.text.matchAll(NAV_NAME_RE)].map((n) => n[1].trim());
     let fileHasComposite = false;

@@ -13,7 +13,50 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 _USAGE_METRICS_RE = re.compile(r"usage\s*metrics", re.IGNORECASE)
-_SQL_DATABASE_RE = re.compile(r'Sql\.Database\(\s*"([^"]+)"\s*,\s*"([^"]+)"', re.IGNORECASE)
+# One connection arg: a literal string value, OR a bare identifier (an M query parameter / let-bound
+# name, e.g. `Sql.Database(ServerParam, DatabaseParam)`) captured symbolically so parameterized
+# connections still contribute comparable physical-source evidence instead of being silently dropped.
+_ARG = r'(?:"([^"]+)"|(\w+))'
+# `\b` matters here: without it "Sql.Database(" also matches inside "PostgreSQL.Database(" and
+# "MySQL.Database(" (both connector names literally end in "...SQL"), miscategorizing those sources
+# as SQL Server. PostgreSQL and MySQL get their own dedicated (and correctly `\b`-anchored) regexes
+# below so this fix doesn't silently drop coverage that previously worked only by substring accident.
+_SQL_DATABASE_RE = re.compile(rf"\bSql\.Database\(\s*{_ARG}\s*,\s*{_ARG}", re.IGNORECASE)
+_POSTGRESQL_RE = re.compile(rf"\bPostgreSQL\.Database\(\s*{_ARG}\s*,\s*{_ARG}", re.IGNORECASE)
+_MYSQL_RE = re.compile(rf"\bMySQL\.Database\(\s*{_ARG}\s*,\s*{_ARG}", re.IGNORECASE)
+_SNOWFLAKE_RE = re.compile(rf"\bSnowflake\.Databases?\(\s*{_ARG}\s*,\s*{_ARG}", re.IGNORECASE)
+_DATABRICKS_RE = re.compile(rf"\bDatabricks\.Catalogs\(\s*{_ARG}\s*,\s*{_ARG}", re.IGNORECASE)
+# BigQuery rarely carries a comparable 2-arg identity (often zero args, or an options record); capture
+# a single literal/identifier arg (billing project) when present, else there's nothing to fingerprint.
+_BIGQUERY_RE = re.compile(rf"\bGoogleBigQuery\.Database\(\s*{_ARG}?", re.IGNORECASE)
+# File-based connectors: the file path is the physical identity. Only a simple literal path or a
+# single bare parameter reference is captured; a concatenation expression (e.g. folder & name &
+# ".csv") is dynamic per-row/per-parameter and cannot be fingerprinted statically.
+_CSV_RE = re.compile(rf"\bCsv\.Document\(\s*File\.Contents\(\s*{_ARG}\s*\)", re.IGNORECASE)
+_PARQUET_RE = re.compile(rf"\bParquet\.Document\(\s*File\.Contents\(\s*{_ARG}\s*\)", re.IGNORECASE)
+# Bare M parameter names common enough in templated connection setups (e.g. every environment's model
+# has a query parameter literally called "Server"/"Database") that a shared PARAMETER NAME alone (not
+# an actual literal value) must not manufacture physical-source evidence between unrelated models.
+_GENERIC_PARAM_NAMES = {
+    "server",
+    "database",
+    "host",
+    "hostname",
+    "warehouse",
+    "instance",
+    "catalog",
+    "schema",
+    "port",
+    "endpoint",
+    "source",
+    "db",
+    "path",
+    "filepath",
+    "file",
+    "url",
+    "connection",
+    "conn",
+}
 _ENTITY_RE = re.compile(r"^\s*entityName:\s*(.+?)\s*$")
 _SCHEMA_RE = re.compile(r"^\s*schemaName:\s*(.+?)\s*$")
 
@@ -219,12 +262,45 @@ def _parse_logical_source(table_files: list[Path]) -> set[tuple[str, str]]:
     return entities
 
 
+def _add_two_arg_physical_source(physical: set[tuple[str, str]], regex: re.Pattern[str], text: str) -> None:
+    """Add a (server, database)-shaped tuple for every match of a 2-positional-arg connector regex.
+
+    Sql.Database, PostgreSQL.Database, Snowflake.Databases, and Databricks.Catalogs all share this
+    "two identifying positional args" shape.
+    """
+    for lit1, id1, lit2, id2 in regex.findall(text):
+        arg1, arg2 = lit1 or id1, lit2 or id2
+        if not arg1 or not arg2:
+            continue
+        if id1 and id2 and arg1.lower() in _GENERIC_PARAM_NAMES and arg2.lower() in _GENERIC_PARAM_NAMES:
+            continue  # templated parameter names alone are not comparable evidence
+        physical.add((arg1.lower(), arg2.lower()))
+
+
+def _add_single_arg_physical_source(physical: set[tuple[str, str]], regex: re.Pattern[str], text: str) -> None:
+    """Add a (value, "")-shaped tuple for a single-arg connector (BigQuery project, CSV/Parquet path)."""
+    for lit, ident in regex.findall(text):
+        arg = lit or ident
+        if not arg:
+            continue
+        if ident and arg.lower() in _GENERIC_PARAM_NAMES:
+            continue
+        physical.add((arg.lower(), ""))
+
+
 def _parse_physical_source(definition_dir: Path) -> set[tuple[str, str]]:
-    """Collect (endpoint, database) tuples from any ``Sql.Database(...)`` in the definition."""
+    """Collect physical data-source tuples from SQL/warehouse/lakehouse/file connectors."""
     physical: set[tuple[str, str]] = set()
     for path in definition_dir.rglob("*.tmdl"):
-        for endpoint, database in _SQL_DATABASE_RE.findall(path.read_text(encoding="utf-8")):
-            physical.add((endpoint.lower(), database.lower()))
+        text = path.read_text(encoding="utf-8")
+        _add_two_arg_physical_source(physical, _SQL_DATABASE_RE, text)
+        _add_two_arg_physical_source(physical, _POSTGRESQL_RE, text)
+        _add_two_arg_physical_source(physical, _MYSQL_RE, text)
+        _add_two_arg_physical_source(physical, _SNOWFLAKE_RE, text)
+        _add_two_arg_physical_source(physical, _DATABRICKS_RE, text)
+        _add_single_arg_physical_source(physical, _BIGQUERY_RE, text)
+        _add_single_arg_physical_source(physical, _CSV_RE, text)
+        _add_single_arg_physical_source(physical, _PARQUET_RE, text)
     return physical
 
 
