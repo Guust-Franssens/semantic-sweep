@@ -71,6 +71,28 @@ describe("precision — acc3 string-literal refs", () => {
   });
 });
 
+describe("precision — acc6 generic bare refs are not ref-backed across tables", () => {
+  it("captures a table-qualified ref only when a qualifier is present in the source DAX", () => {
+    const qualified = extractFeatures("SUM(Sales[Amount])");
+    expect(qualified.qualifiedRefs.has("sales.amount")).toBe(true);
+    const bare = extractFeatures("SUM([Amount])");
+    expect(bare.qualifiedRefs.size).toBe(0);
+    expect(bare.refs.has("amount")).toBe(true); // still a bare ref, just not table-qualified
+  });
+
+  it("does not treat a shared generic column name on unrelated tables as ref-backed", () => {
+    // Sales[Amount]/[Date]/[Id]/[Name] vs Budget[Amount]/[Date]/[Id]/[Name]: same GENERIC names,
+    // unrelated tables (the P0 false positive: "Sales[Amount] ~ Budget[Amount]"). Still matches
+    // structurally (surfaces for review) but must not manufacture strong-duplicate evidence.
+    const cols = ["Amount", "Date", "Id", "Name"];
+    const a: Measure[] = cols.map((c, i) => ({ name: `MA${i}`, dax: `SUM(Sales[${c}])` }));
+    const b: Measure[] = cols.map((c, i) => ({ name: `MB${i}`, dax: `SUM(Budget[${c}])` }));
+    const m = matchModelMeasures(a, b);
+    expect(m.matched.length).toBeGreaterThanOrEqual(3);
+    expect(m.strongMatched).toBe(0);
+  });
+});
+
 describe("precision — acc5 ref-backed strong evidence", () => {
   it("counts a shape-only skeleton match as review evidence, not strong-duplicate evidence", () => {
     // SUM(Sales[a_i]) vs SUM(HR[b_i]): identical skeleton, DISJOINT refs. They match structurally

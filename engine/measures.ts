@@ -35,6 +35,16 @@ const GENERIC_NAMES = new Set([
   "total", "count", "sum", "amount", "value", "measure", "result", "kpi", "average", "max", "min",
 ]);
 
+// Column/measure ref names common enough to recur across unrelated tables on any estate with a
+// shared naming convention (e.g. every fact table has an [Amount], every dimension has a [Date]).
+// A bare match on one of these must not, by itself, count as ref-backed strong-duplicate evidence
+// (acc6) -- unlike GENERIC_NAMES above (measure-name weighting), this gates measure-level evidence.
+const GENERIC_REF_NAMES = new Set([
+  "id", "key", "code", "name", "date", "value", "amount", "total", "count", "sum", "status", "type",
+  "description", "flag", "number", "quantity", "price", "region", "category", "year", "month", "day",
+  "created", "modified", "updated",
+]);
+
 const COMPONENT_WEIGHTS: Record<string, number> = { refs: 0.45, functions: 0.3, flags: 0.15, operators: 0.1 };
 const SKELETON_SCORE = 0.92;
 // Same structural skeleton but the referenced names differ: score between SKELETON_FLOOR (pure shape
@@ -69,6 +79,21 @@ function matchAll(re: RegExp, text: string, group = 0): string[] {
   return out;
 }
 
+// "table.column" refs, captured only when a table qualifier (bare word or 'quoted name') immediately
+// precedes the bracket in the source DAX. A bare [Column] with no qualifier (row-context reference or
+// a measure call) contributes nothing here -- it stays in the unqualified `refs` set instead.
+function extractQualifiedRefs(text: string): Set<string> {
+  const out = new Set<string>();
+  const re = /(?:'([^']*)'|(\w+))?\[([^\]]+)\]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const qualifier = m[1] ?? m[2];
+    if (qualifier) out.add(`${qualifier}.${m[3]}`);
+    if (m.index === re.lastIndex) re.lastIndex++;
+  }
+  return out;
+}
+
 export function extractFeatures(dax: string): DaxFeatures {
   const norm = normalizeDax(dax);
   const functions = new Set(matchAll(/\b([a-z][a-z0-9]*)\s*\(/g, norm, 1));
@@ -80,10 +105,26 @@ export function extractFeatures(dax: string): DaxFeatures {
     skeleton: skeleton(norm),
     functions,
     refs: new Set(matchAll(/\[([^\]]+)\]/g, noStrings, 1).map((s) => s.toLowerCase())),
+    qualifiedRefs: extractQualifiedRefs(noStrings),
     aggregators: intersection(functions, AGGREGATORS),
     operators: new Set(matchAll(/[+\-*/&<>=]/g, norm)),
     flags: intersection(functions, CONTEXT_FLAGS),
   };
+}
+
+// Two matched measures are "ref-backed" (real evidence, not a coincidental shape collision) when:
+// identical normalized DAX, OR an exact table-qualified column/measure match, OR a shared BARE name
+// that is specific enough to not be a coincidence. A bare match on a generic name alone (e.g. two
+// unrelated tables both having an [Amount] or [Date] column) is NOT accepted -- that previously let
+// Sales[Amount] and Budget[Amount] manufacture strong-duplicate evidence on shared-schema estates
+// (acc6). Renamed-table clones with specific shared column names (e.g. Sales[amt0]~Revenue[amt0])
+// still count, preserving the acc5 renamed-clone heuristic.
+function isRefBacked(a: DaxFeatures, b: DaxFeatures): boolean {
+  if (a.norm === b.norm) return true;
+  if (intersection(a.qualifiedRefs, b.qualifiedRefs).size > 0) return true;
+  const shared = intersection(a.refs, b.refs);
+  for (const name of shared) if (!GENERIC_REF_NAMES.has(name)) return true;
+  return false;
 }
 
 function jac(a: Set<string>, b: Set<string>): number {
@@ -179,9 +220,10 @@ export function matchModelMeasures(
     usedB.add(j);
     matched.push({ a: realA[i].name, b: realB[j].name, score });
     matchedWeight += Math.min(weightsA[i], weightsB[j]) * score;
-    // Ref-backed = identical DAX or a shared referenced column/measure. A pure structural shape match
-    // (disjoint refs) is NOT counted, so it can surface for review but never manufactures a strong dup.
-    if (featsA[i].norm === featsB[j].norm || intersection(featsA[i].refs, featsB[j].refs).size > 0) {
+    // Ref-backed = identical DAX, an exact qualified column match, or a shared SPECIFIC bare name. A
+    // pure structural shape match (disjoint refs) or a generic-name-only coincidence is NOT counted,
+    // so it can surface for review but never manufactures a strong dup.
+    if (isRefBacked(featsA[i], featsB[j])) {
       strongMatched += 1;
     }
   }

@@ -64,6 +64,11 @@ export interface DaxFeatures {
   skeleton: string;
   functions: Set<string>;
   refs: Set<string>;
+  // "table.column" refs, populated only when a table qualifier is present in the source DAX (e.g.
+  // "sales.amount" from Sales[Amount]). Used to require unambiguous evidence before two measures
+  // referencing a common *generic* bare name (e.g. [Amount], [Date]) on different tables count as
+  // ref-backed strong-duplicate evidence (acc6).
+  qualifiedRefs: Set<string>;
   aggregators: Set<string>;
   operators: Set<string>;
   flags: Set<string>;

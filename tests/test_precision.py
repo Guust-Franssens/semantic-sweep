@@ -6,7 +6,9 @@ Guards the Tier-1 accuracy fixes that reduce false positives without losing reca
 * acc3 - a bracketed token inside a DAX string literal must not leak as a column reference;
 * acc5 - a pure structural shape match (disjoint refs) is review evidence, never strong-dup evidence;
 * acc4 - a shared date model contained in two unrelated fact models must not bridge them into one
-  cluster (directional subset attachment).
+  cluster (directional subset attachment);
+* acc6 - a shared GENERIC bare column name (e.g. [Amount], [Date]) on unrelated tables must not
+  manufacture ref-backed strong-duplicate evidence on a shared-schema estate.
 
 Kept in lockstep with ``engine/measures.ts`` / ``engine/index.ts`` so TS and Python stay identical.
 """
@@ -110,6 +112,27 @@ def test_shared_ref_is_ref_backed():
     a = [Measure(name=f"MA{i}", dax=f"SUM(Sales[amt{i}])") for i in range(4)]
     b = [Measure(name=f"MB{i}", dax=f"SUM(Revenue[amt{i}])") for i in range(4)]
     assert match_model_measures(a, b).strong_matched >= 3
+
+
+def test_qualified_ref_captured_only_with_a_table_qualifier():
+    # acc6: "table.column" is only captured when a qualifier is actually present in the source DAX.
+    qualified = extract_features("SUM(Sales[Amount])")
+    assert "sales.amount" in qualified.qualified_refs
+    bare = extract_features("SUM([Amount])")
+    assert not bare.qualified_refs
+    assert "amount" in bare.refs  # still a bare ref, just not table-qualified
+
+
+def test_generic_bare_ref_across_unrelated_tables_is_not_ref_backed():
+    # acc6: Sales[Amount]/[Date]/[Id]/[Name] vs Budget[Amount]/[Date]/[Id]/[Name] -- same GENERIC
+    # names, unrelated tables (the P0 false positive: "Sales[Amount] ~ Budget[Amount]"). Still
+    # matches structurally (surfaces for review) but must not manufacture strong-dup evidence.
+    cols = ["Amount", "Date", "Id", "Name"]
+    a = [Measure(name=f"MA{i}", dax=f"SUM(Sales[{c}])") for i, c in enumerate(cols)]
+    b = [Measure(name=f"MB{i}", dax=f"SUM(Budget[{c}])") for i, c in enumerate(cols)]
+    match = match_model_measures(a, b)
+    assert len(match.matched) >= 3
+    assert match.strong_matched == 0
 
 
 def test_date_hub_does_not_bridge_supersets(tmp_path):

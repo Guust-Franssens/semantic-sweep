@@ -88,10 +88,45 @@ GENERIC_NAMES = {
     "min",
 }
 
+# Column/measure ref names common enough to recur across unrelated tables on any estate with a
+# shared naming convention (e.g. every fact table has an [Amount], every dimension has a [Date]). A
+# bare match on one of these must not, by itself, count as ref-backed strong-duplicate evidence
+# (acc6) -- unlike GENERIC_NAMES above (measure-name weighting), this gates measure-level evidence.
+GENERIC_REF_NAMES = {
+    "id",
+    "key",
+    "code",
+    "name",
+    "date",
+    "value",
+    "amount",
+    "total",
+    "count",
+    "sum",
+    "status",
+    "type",
+    "description",
+    "flag",
+    "number",
+    "quantity",
+    "price",
+    "region",
+    "category",
+    "year",
+    "month",
+    "day",
+    "created",
+    "modified",
+    "updated",
+}
+
 _COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.DOTALL)
 _COMMENT_LINE = re.compile(r"//[^\n]*")
 _BRACKET = re.compile(r"\[([^\]]+)\]")
 _REF = re.compile(r"(?:'[^']*'|\w+)?\[[^\]]*\]")
+# Same shape as _REF but captures the qualifier (quoted or bare) separately from the bracket content,
+# so a "table.column" ref can be built only when a qualifier is actually present in the source DAX.
+_QUALIFIED_REF = re.compile(r"(?:'([^']*)'|(\w+))?\[([^\]]+)\]")
 _STRING = re.compile(r'"[^"]*"')
 _NUMBER = re.compile(r"\b\d+(?:\.\d+)?\b")
 _FUNC = re.compile(r"\b([a-z][a-z0-9]*)\s*\(")
@@ -109,13 +144,18 @@ _AGG_PENALTY = 0.6
 
 
 @dataclass(frozen=True)
-class DaxFeatures:
-    """Lexical features extracted from one measure's normalized DAX."""
+class DaxFeatures:  # pylint: disable=too-many-instance-attributes
+    """Lexical features extracted from one measure's normalized DAX (cohesive feature bag)."""
 
     norm: str
     skeleton: str
     functions: frozenset[str]
     refs: frozenset[str]
+    # "table.column" refs, populated only when a table qualifier is present in the source DAX (e.g.
+    # "sales.amount" from Sales[Amount]). Used to require unambiguous evidence before two measures
+    # referencing a common *generic* bare name (e.g. [Amount], [Date]) on different tables count as
+    # ref-backed strong-duplicate evidence (acc6).
+    qualified_refs: frozenset[str]
     aggregators: frozenset[str]
     operators: frozenset[str]
     flags: frozenset[str]
@@ -136,6 +176,16 @@ def _skeleton(norm: str) -> str:
     return re.sub(r"\s+", "", text)
 
 
+def _extract_qualified_refs(no_strings: str) -> frozenset[str]:
+    """Extract "table.column" refs, only when a table qualifier is present in the source DAX."""
+    out = set()
+    for quoted, bare, name in _QUALIFIED_REF.findall(no_strings):
+        qualifier = quoted or bare
+        if qualifier:
+            out.add(f"{qualifier}.{name}")
+    return frozenset(out)
+
+
 def extract_features(dax: str) -> DaxFeatures:
     """Extract :class:`DaxFeatures` from a raw DAX expression."""
     norm = normalize_dax(dax)
@@ -148,10 +198,29 @@ def extract_features(dax: str) -> DaxFeatures:
         skeleton=_skeleton(norm),
         functions=functions,
         refs=frozenset(m.lower() for m in _BRACKET.findall(no_strings)),
+        qualified_refs=_extract_qualified_refs(no_strings),
         aggregators=frozenset(functions & AGGREGATORS),
         operators=frozenset(_OPERATOR.findall(norm)),
         flags=frozenset(functions & CONTEXT_FLAGS),
     )
+
+
+def _is_ref_backed(a: DaxFeatures, b: DaxFeatures) -> bool:
+    """True if two matched measures share genuine reference evidence, not a coincidental collision.
+
+    Identical DAX or an exact table-qualified column/measure match is unambiguous. A shared BARE name
+    is only accepted when it is specific enough to not be a coincidence -- a shared *generic* name
+    like [Amount] or [Date] recurs across unrelated tables on any estate with a common naming
+    convention and must not manufacture strong-duplicate evidence on its own (acc6). Renamed-table
+    clones with specific shared column names (e.g. Sales[amt0] ~ Revenue[amt0]) still count,
+    preserving the acc5 renamed-clone heuristic.
+    """
+    if a.norm == b.norm:
+        return True
+    if a.qualified_refs & b.qualified_refs:
+        return True
+    shared = a.refs & b.refs
+    return any(name not in GENERIC_REF_NAMES for name in shared)
 
 
 def _jaccard(a: frozenset[str], b: frozenset[str]) -> float:
@@ -260,9 +329,10 @@ def match_model_measures(
         used_b.add(j)
         matched.append((real_a[i].name, real_b[j].name, score))
         matched_weight += min(weights_a[i], weights_b[j]) * score
-        # Ref-backed = identical DAX or a shared referenced column/measure. A pure structural shape
-        # match (disjoint refs) is not counted, so it surfaces for review but never manufactures a dup.
-        if feats_a[i].norm == feats_b[j].norm or (feats_a[i].refs & feats_b[j].refs):
+        # Ref-backed = identical DAX, an exact qualified column match, or a shared SPECIFIC bare name.
+        # A pure structural shape match (disjoint refs) or a generic-name-only coincidence is not
+        # counted, so it surfaces for review but never manufactures a dup.
+        if _is_ref_backed(feats_a[i], feats_b[j]):
             strong_matched += 1
 
     total_a, total_b = sum(weights_a), sum(weights_b)
