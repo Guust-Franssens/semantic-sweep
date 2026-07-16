@@ -32,21 +32,34 @@ export function UsageSummary({ recs }: { recs: Recommendation[] }) {
   const merge = count("merge");
   const conflicts = count("semantic-conflict") + count("governance-conflict");
   const evidence = count("insufficient-evidence") + count("retirement-candidate-blocked");
+  const total = retire + merge + conflicts + evidence;
   const savingHrs = Math.round(
     recs.filter((r) => r.action === "retirement-candidate").reduce((s, r) => s + r.savingsRefreshMinPerYear, 0) / 60,
   );
+  // Lead with the total surfaced for review, never a bare retirement count. On many real estates the
+  // clean-retire number is 0 (everything is a conflict or needs more evidence), and opening with a big
+  // "0" reads as "found nothing" when the tool actually surfaced several calls a human should action.
+  if (total === 0)
+    return (
+      <div className="insights">
+        <div className="txt">No cross-team consolidation calls in this estate. 🎉</div>
+      </div>
+    );
   return (
     <div className="insights">
-      <div className="big">{retire}</div>
+      <div className="big">{total}</div>
       <div className="txt">
-        safe <strong>retirement candidate{retire === 1 ? "" : "s"}</strong> (duplicate + unused + evidence)
+        consolidation call{total === 1 ? "" : "s"} surfaced for review:{" "}
+        <strong>{retire}</strong> safe to retire
         {savingHrs > 0 && (
           <>
-            {", "}reclaiming ~<strong>{savingHrs.toLocaleString()} refresh-hrs/yr*</strong>
+            {" "}
+            (reclaiming ~<strong>{savingHrs.toLocaleString()} refresh-hrs/yr*</strong>)
           </>
         )}
-        . Plus <strong>{merge}</strong> to merge, <strong>{conflicts}</strong> conflict{conflicts === 1 ? "" : "s"} to
-        resolve, <strong>{evidence}</strong> needing more evidence. <span className="muted">*illustrative estimate.</span>
+        , <strong>{merge}</strong> to merge &amp; redirect, <strong>{conflicts}</strong> conflict
+        {conflicts === 1 ? "" : "s"} to resolve, <strong>{evidence}</strong> needing more evidence.
+        {savingHrs > 0 && <span className="muted"> *illustrative estimate.</span>}
       </div>
     </div>
   );

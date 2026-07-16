@@ -3,15 +3,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Boxes,
   ClipboardList,
-  Cog,
   DatabaseZap,
   GitBranch,
-  GitCompare,
   GitMerge,
   LayoutDashboard,
   LayoutGrid,
   Layers,
-  Link2,
   type LucideIcon,
   Moon,
   RefreshCw,
@@ -553,22 +550,37 @@ export function SweepPage() {
 
   const pct = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
+  // Hero row = the four numbers a customer acts on (it always fills one clean row). Engine-internal
+  // and excluded/context counts drop to a muted strip below, instead of orphaning a 7th StatCard onto
+  // a second row and stretching every sibling card with dead vertical space.
+  const contextBits: string[] = [
+    `${s.pairs.toLocaleString()} pairs scored`,
+    `${s.systemGenerated} system-generated`,
+  ];
+  if (s.composite > 0) contextBits.push(`${s.composite} composite / derived`);
+  if (usageOn) contextBits.push(`${s.chains} promotion chain${s.chains === 1 ? "" : "s"}`);
+
   const statCards = (
-    <section className="grid grid-cols-2 gap-[12px] md:grid-cols-3 xl:grid-cols-6">
-      <StatCard icon={Boxes} value={s.models} label="Models scanned" tint="#0f6cbd" />
-      <StatCard icon={GitCompare} value={s.pairs} label="Pairs scored" tint="#5c6b78" />
-      <StatCard icon={Layers} value={s.clusters} label="Duplicate clusters" tint="#0f6cbd" accent />
-      {usageOn ? (
-        <StatCard icon={Trash2} value={retire} label="Retirement candidates" tint="#0e700e" accent />
-      ) : (
-        <StatCard icon={GitBranch} value={s.chains} label="Promotion chains" tint="#8764b8" />
-      )}
-      {s.composite > 0 && (
-        <StatCard icon={Link2} value={s.composite} label="Composite / derived" sub="built on another dataset" tint="#8764b8" />
-      )}
-      <StatCard icon={Cog} value={s.systemGenerated} label="System-generated" tint="#5c6b78" />
-      <StatCard icon={ClipboardList} value={s.review} label="Needs review" tint="#bc4b09" />
-    </section>
+    <>
+      <section className="grid grid-cols-2 gap-[12px] md:grid-cols-4">
+        <StatCard icon={Boxes} value={s.models} label="Models scanned" tint="#0f6cbd" />
+        <StatCard icon={Layers} value={s.clusters} label="Duplicate clusters" tint="#0f6cbd" accent />
+        <StatCard icon={ClipboardList} value={s.review} label="Needs review" tint="#bc4b09" accent />
+        {usageOn ? (
+          <StatCard icon={Trash2} value={retire} label="Retirement candidates" tint="#0e700e" accent />
+        ) : (
+          <StatCard icon={GitBranch} value={s.chains} label="Promotion chains" tint="#8764b8" />
+        )}
+      </section>
+      <div className="mt-[10px] flex flex-wrap items-center gap-x-[8px] gap-y-[2px] text-[12px] text-muted-foreground">
+        {contextBits.map((b, i) => (
+          <span key={b} className="flex items-center gap-[8px]">
+            {i > 0 && <span className="opacity-40">·</span>}
+            {b}
+          </span>
+        ))}
+      </div>
+    </>
   );
 
   if (restoring) return <RestoreSplash />;
