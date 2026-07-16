@@ -180,10 +180,12 @@ def _read_column(lines: list[str], i: int, table: str) -> tuple[Column, int]:
     """Read one column starting at line ``i``; return it and the next line index."""
     indent = _tab_indent(lines[i])
     body = lines[i].strip()[len("column") :].strip()
-    if body.startswith("'"):
-        name = body[1 : body.index("'", 1)]
-    else:
-        name = body.split("=")[0].strip()
+    # Same shape as _read_measure's name capture: take everything up to the first top-level "=" (or
+    # the whole body if there is none), then _unquote() below. Avoids hunting for a specific closing
+    # quote index, which raised ValueError when a quoted name was malformed/unterminated (e.g. a
+    # stray "column 'Broken" line with no closing quote) -- dax-tokenizer-hardening.
+    match = re.match(r"'[^']*'|[^=]*", body)
+    name = match.group(0) if match else body
     data_type: str | None = None
     hidden = False
     i += 1

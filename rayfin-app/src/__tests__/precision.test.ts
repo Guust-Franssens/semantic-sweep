@@ -10,7 +10,7 @@ import {
 } from "@engine/index";
 import type { InputFile } from "@engine/parser";
 import { loadModelsFromFiles } from "@engine/parser";
-import { extractFeatures, matchModelMeasures } from "@engine/measures";
+import { extractFeatures, matchModelMeasures, normalizeDax } from "@engine/measures";
 import type { Measure } from "@engine/types";
 
 // Build a model from an explicit {table: columns} map + (name, dax) measures, so the schema/source
@@ -68,6 +68,31 @@ describe("precision — acc3 string-literal refs", () => {
     expect(f.refs.has("amount")).toBe(true); // the real column ref survives
     expect(f.refs.has("red")).toBe(false); // format-string tokens are NOT refs
     expect(f.refs.has("green")).toBe(false);
+  });
+});
+
+describe("dax-tokenizer-hardening — escape-aware strings and comments", () => {
+  it("does not leak a bracketed token inside a string with an escaped quote as a column ref", () => {
+    // DAX embeds a literal quote in a string by doubling it (`""`). The old non-escape-aware
+    // `"[^"]*"` stopped at the FIRST embedded quote, leaving the remainder of the string (including
+    // a bracketed token) unneutralized and leaking it as a bogus column ref.
+    const f = extractFeatures('FORMAT(Sales[Amount], "Say ""[Bracket]"" here")');
+    expect(f.refs.has("amount")).toBe(true);
+    expect(f.refs.has("bracket")).toBe(false);
+  });
+
+  it("does not treat a line-comment marker inside a string literal as a real comment", () => {
+    // normalizeDax used to strip comments before any string protection, so a "//" occurring INSIDE
+    // a string literal (e.g. "100 // percent") was misread as a real comment start and truncated
+    // everything after it, silently deleting real DAX code later in the expression.
+    const norm = normalizeDax('VAR _x = "100 // percent" RETURN SUM(Sales[Amount])');
+    expect(norm).toContain("return sum(sales[amount])");
+  });
+
+  it("does not treat a block-comment marker inside a string literal as a real comment", () => {
+    const norm = normalizeDax('VAR _x = "50% /* not a comment */ done" RETURN SUM(Sales[Amount])');
+    expect(norm).toContain("return sum(sales[amount])");
+    expect(norm).toContain("not a comment"); // string content preserved, not stripped as a comment
   });
 });
 

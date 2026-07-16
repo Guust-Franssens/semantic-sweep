@@ -13,7 +13,7 @@ weren't recognized at all.
 
 # pylint: disable=missing-function-docstring,protected-access
 
-from semantic_sweep.parser import _parse_physical_source, _read_measure
+from semantic_sweep.parser import _parse_physical_source, _read_column, _read_measure
 
 
 def _dax(*lines: str) -> str:
@@ -116,3 +116,28 @@ def test_captures_a_parameterized_sql_database_call_symbolically(tmp_path):
 def test_does_not_manufacture_evidence_from_generic_param_names_alone(tmp_path):
     # "Server"/"Database" alone are template placeholders, not evidence.
     assert _physical("Sql.Database(Server, Database)", tmp_path) == set()
+
+
+def test_quoted_column_name_is_read():
+    col, nxt = _read_column(["\tcolumn 'My Column'", "\t\tdataType: string"], 0, "T")
+    assert col.name == "My Column"
+    assert nxt == 2
+
+
+def test_bare_column_name_is_read():
+    col, _ = _read_column(["\tcolumn MyColumn", "\t\tdataType: int64"], 0, "T")
+    assert col.name == "MyColumn"
+
+
+def test_calculated_column_with_quoted_name_stops_name_at_the_equals_sign():
+    col, _ = _read_column(["\tcolumn 'Calc Column' = SUM(Sales[Amount])"], 0, "T")
+    assert col.name == "Calc Column"
+
+
+def test_unterminated_quoted_column_name_does_not_raise():
+    # dax-tokenizer-hardening: a malformed/truncated export (e.g. "column 'Broken" with no closing
+    # quote) previously raised ValueError from body.index("'", 1) finding no match. Must degrade to
+    # a safe, non-crashing name instead of blowing up the whole scan.
+    col, nxt = _read_column(["\tcolumn 'Broken"], 0, "T")
+    assert nxt == 1
+    assert "Broken" in col.name

@@ -120,14 +120,19 @@ GENERIC_REF_NAMES = {
     "updated",
 }
 
-_COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.DOTALL)
-_COMMENT_LINE = re.compile(r"//[^\n]*")
 _BRACKET = re.compile(r"\[([^\]]+)\]")
 _REF = re.compile(r"(?:'[^']*'|\w+)?\[[^\]]*\]")
 # Same shape as _REF but captures the qualifier (quoted or bare) separately from the bracket content,
 # so a "table.column" ref can be built only when a qualifier is actually present in the source DAX.
 _QUALIFIED_REF = re.compile(r"(?:'([^']*)'|(\w+))?\[([^\]]+)\]")
-_STRING = re.compile(r'"[^"]*"')
+# A DAX string literal, escape-aware: an embedded literal `"` is written as a doubled `""` inside the
+# string (e.g. `"He said ""hi"""`). A naive `"[^"]*"` stops at the first inner `"`, truncating the
+# literal and leaking the remainder as if it were DAX code (dax-tokenizer-hardening).
+_STRING = re.compile(r'"(?:[^"]|"")*"')
+# One pass, string-aware: tries a full string literal FIRST at each position, so a "//" or "/*" that
+# appears INSIDE a string is consumed as part of the string and never misread as a comment start (the
+# previous two-pass comment stripper had no string awareness at all).
+_COMMENT_OR_STRING = re.compile(_STRING.pattern + r"|/\*.*?\*/|//[^\n]*", re.DOTALL)
 _NUMBER = re.compile(r"\b\d+(?:\.\d+)?\b")
 _FUNC = re.compile(r"\b([a-z][a-z0-9]*)\s*\(")
 _OPERATOR = re.compile(r"[+\-*/&<>=]")
@@ -162,9 +167,8 @@ class DaxFeatures:  # pylint: disable=too-many-instance-attributes
 
 
 def normalize_dax(dax: str) -> str:
-    """Lower-case the DAX and strip comments and redundant whitespace."""
-    text = _COMMENT_BLOCK.sub(" ", dax)
-    text = _COMMENT_LINE.sub(" ", text)
+    """Lower-case the DAX and strip comments (string/escape aware) and redundant whitespace."""
+    text = _COMMENT_OR_STRING.sub(lambda m: m.group(0) if m.group(0).startswith('"') else " ", dax)
     return re.sub(r"\s+", " ", text.lower()).strip()
 
 

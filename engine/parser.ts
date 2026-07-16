@@ -117,9 +117,11 @@ function readColumn(lines: string[], start: number, table: string): [Column, num
   let i = start;
   const indent = tabIndent(lines[i]);
   const body = lines[i].trim().slice("column".length).trim();
-  let name: string;
-  if (body.startsWith("'")) name = body.slice(1, body.indexOf("'", 1));
-  else name = body.split("=")[0].trim();
+  // Same shape as readMeasure's name capture: take everything up to the first top-level "=" (or the
+  // whole body if there is none), then unquote() below. Avoids hunting for a specific closing quote
+  // index, which garbled output (slice(1, -1) on indexOf's -1) when a quoted name was malformed or
+  // unterminated (e.g. a stray "column 'Broken" line with no closing quote) -- dax-tokenizer-hardening.
+  const name = /^(?:'[^']*'|[^=]*)/.exec(body)?.[0] ?? body;
   let dataType: string | null = null;
   let hidden = false;
   i += 1;

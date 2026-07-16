@@ -117,3 +117,40 @@ describe("source-physical parser broadening", () => {
   });
 });
 
+// dax-tokenizer-hardening: readColumn previously found a quoted name's closing "'" via
+// body.indexOf("'", 1), which returns -1 when the quote is unterminated -- body.slice(1, -1) on a -1
+// end index then silently drops the last real character instead of erroring or degrading safely.
+function columnModel(): InputFile[] {
+  const table =
+    "table Cols\n" +
+    "\tcolumn 'My Column'\n" +
+    "\t\tdataType: string\n" +
+    "\tcolumn MyColumn\n" +
+    "\t\tdataType: int64\n" +
+    "\tcolumn 'Calc Column' = SUM(Sales[Amount])\n" +
+    "\tcolumn 'Broken\n";
+  return [{ path: "WS.Workspace/Cols Model.SemanticModel/definition/tables/Cols.tmdl", text: table }];
+}
+
+describe("column name parsing", () => {
+  const cards = loadModelsFromFiles(columnModel(), true);
+  const card = cards.find((c) => c.name === "Cols Model")!;
+
+  it("reads a quoted column name", () => {
+    expect(card.columns.some((c) => c.name === "My Column")).toBe(true);
+  });
+
+  it("reads a bare column name", () => {
+    expect(card.columns.some((c) => c.name === "MyColumn")).toBe(true);
+  });
+
+  it("stops a calculated column's quoted name at the '=' sign", () => {
+    expect(card.columns.some((c) => c.name === "Calc Column")).toBe(true);
+  });
+
+  it("does not crash or drop a character on an unterminated quoted name", () => {
+    const broken = card.columns.find((c) => c.name.includes("Broken"));
+    expect(broken).toBeDefined();
+  });
+});
+

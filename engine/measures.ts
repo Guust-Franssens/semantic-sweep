@@ -55,15 +55,24 @@ const SKELETON_SCORE = 0.92;
 const SKELETON_FLOOR = 0.9;
 const AGG_PENALTY = 0.6;
 
+// A DAX string literal, escape-aware: an embedded literal `"` is written as a doubled `""` inside the
+// string (e.g. `"He said ""hi"""`). A naive `"[^"]*"` stops at the first inner `"`, truncating the
+// literal and leaking the remainder as if it were DAX code (dax-tokenizer-hardening).
+const STRING_SRC = String.raw`"(?:[^"]|"")*"`;
+const STRING_RE = new RegExp(STRING_SRC, "g");
+// One pass, string-aware: tries a full string literal FIRST at each position, so a "//" or "/*" that
+// appears INSIDE a string is consumed as part of the string and never misread as a comment start (the
+// previous two-pass comment stripper had no string awareness at all).
+const COMMENT_OR_STRING_RE = new RegExp(`${STRING_SRC}|/\\*[\\s\\S]*?\\*/|//[^\\n]*`, "g");
+
 export function normalizeDax(dax: string): string {
-  let text = dax.replace(/\/\*[\s\S]*?\*\//g, " ");
-  text = text.replace(/\/\/[^\n]*/g, " ");
+  const text = dax.replace(COMMENT_OR_STRING_RE, (m) => (m.startsWith('"') ? m : " "));
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function skeleton(norm: string): string {
   let text = norm.replace(/(?:'[^']*'|\w+)?\[[^\]]*\]/g, "#r#");
-  text = text.replace(/"[^"]*"/g, "#s#");
+  text = text.replace(STRING_RE, "#s#");
   text = text.replace(/\b\d+(?:\.\d+)?\b/g, "#n#");
   return text.replace(/\s+/g, "");
 }
@@ -99,7 +108,7 @@ export function extractFeatures(dax: string): DaxFeatures {
   const functions = new Set(matchAll(/\b([a-z][a-z0-9]*)\s*\(/g, norm, 1));
   // Neutralize string literals before extracting column/measure refs so a format string like
   // FORMAT(x, "[Red]0") does not leak a bogus "red" reference (acc3).
-  const noStrings = norm.replace(/"[^"]*"/g, '""');
+  const noStrings = norm.replace(STRING_RE, '""');
   return {
     norm,
     skeleton: skeleton(norm),
