@@ -2,7 +2,12 @@ import { authenticated, boolean, date, entity, int, text, uuid } from '@microsof
 
 // One saved estate scan. The full ScanResult is gzip+base64 encoded and split across ScanChunk rows
 // (bounded NVARCHAR(4000)); the summary counts here let the "saved scans" list render without
-// unpacking the blob. Rows are scoped to the signed-in user via the user_id policy (claims.sub).
+// unpacking the blob. Rows are scoped to the signed-in user via the user_id policy (claims.sub) for
+// read/update/delete.
+//
+// SECURITY NOTE: Data API Builder does not support database policies on the `create` action (INSERT
+// statements don't support WHERE predicates), so this policy does NOT constrain what user_id a caller
+// can write on insert. See rayfin-app/SECURITY.md for the full finding and recommended remediation.
 @entity()
 @authenticated('*', {
   policy: (claims, item) => claims.sub.eq(item.user_id),

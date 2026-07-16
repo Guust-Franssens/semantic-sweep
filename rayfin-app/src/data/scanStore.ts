@@ -3,7 +3,12 @@
 // as a Fabric App rather than a static SPA. The heavy ScanResult is gzip+base64 chunked (scanBlob)
 // across ScanChunk rows; a SavedScan header row carries summary counts so the history list renders
 // without inflating any blob. All rows are stamped with user_id (= JWT sub) so the per-user row
-// policy on both entities scopes reads to the signed-in user.
+// policy on both entities scopes reads, updates, and deletes to the signed-in user.
+//
+// SECURITY NOTE: that row policy does not cover this function's writes. Data API Builder has no
+// database-policy support on the `create` action, so the `user_id` passed in below is trusted from
+// the caller with no server-side check. See rayfin-app/SECURITY.md for the full finding; the readback
+// check further down guards against accidental self-mismatch only, not a forged user_id.
 
 import { BAND_REVIEW } from "@engine/index";
 import type { ScanResult } from "@engine/scan";
@@ -142,6 +147,10 @@ export async function saveScan(
   // segment as user.id; if the DB compares the full sub the write succeeds but every read is filtered
   // out — a silent "no saved scans". Detect that here (before writing N chunks) so persistScan surfaces
   // a clear toast instead of the app quietly forgetting every scan.
+  // Note: this only catches accidental self-mismatch (this app passing the wrong id for its own
+  // signed-in user). It cannot catch a deliberate forged user_id from another caller, since a forged
+  // row reads back fine for whoever's id was actually written; see the SECURITY NOTE at the top of
+  // this file.
   const readback = (await client.data.SavedScan
     .select(["id"])
     .where({ id: { eq: id }, user_id: { eq: userId } })
