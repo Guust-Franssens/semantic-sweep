@@ -25,6 +25,9 @@ export interface ScannerTable {
   measures?: ScannerMeasure[];
   isHidden?: boolean;
 }
+export interface ScannerRole {
+  name?: string;
+}
 export interface ScannerDataset {
   id: string;
   name: string;
@@ -33,6 +36,13 @@ export interface ScannerDataset {
   createdDate?: string;
   tables?: ScannerTable[];
   datasourceUsages?: Array<{ datasourceInstanceId?: string }>;
+  // RLS role definitions (documented Scanner field) — presence means RLS is configured.
+  roles?: ScannerRole[];
+  // Documented Scanner health flags: true/set when the scan couldn't confirm or fetch the schema.
+  // There is no calculation-group field anywhere in this payload shape, so hasCalcGroups below is
+  // always reported as unknown (undefined), never a known false.
+  schemaMayNotBeUpToDate?: boolean;
+  schemaRetrievalError?: string;
 }
 export interface ScannerReport {
   id?: string;
@@ -145,12 +155,17 @@ export function scannerToModels(body: ScanResultBody): ModelCard[] {
         relationships: [], // Scanner does not return relationships
         sourceLogical: new Set<string>(),
         sourcePhysical,
-        hasRls: false,
-        hasCalcGroups: false,
+        hasRls: (ds.roles?.length ?? 0) > 0,
+        // The Scanner API's dataset schema has no calculation-group field at all (confirmed against
+        // the documented WorkspaceInfoDataset shape) — genuinely unknown, not "false". See the
+        // ModelCard.hasCalcGroups comment in engine/types.ts.
+        hasCalcGroups: undefined,
         systemGenerated: SYSTEM_NAME.test(ds.name),
         datasetId: ds.id,
         workspaceId: ws.id,
         derivedFrom: derivedFrom.size ? [...derivedFrom] : undefined,
+        schemaMayNotBeUpToDate: ds.schemaMayNotBeUpToDate,
+        schemaRetrievalError: ds.schemaRetrievalError,
         usage,
       });
     }

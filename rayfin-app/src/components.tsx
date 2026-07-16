@@ -461,7 +461,7 @@ export function ModelDrawer({ card, pairs, labels, onClose, onOpenPair }: ModelD
           <dt>RLS</dt>
           <dd>{card.hasRls ? "yes" : "no"}</dd>
           <dt>Calc groups</dt>
-          <dd>{card.hasCalcGroups ? "yes" : "no"}</dd>
+          <dd>{card.hasCalcGroups === undefined ? "unknown" : card.hasCalcGroups ? "yes" : "no"}</dd>
         </dl>
         <div className="tag">Measures</div>
         <div className="chiplist">

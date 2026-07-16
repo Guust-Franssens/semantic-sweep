@@ -80,28 +80,41 @@ function applicable(name: string, a: ModelCard, b: ModelCard): boolean {
 
 function classifyBand(
   measureSim: number, contain: number, schema: number, srcLogical: number, headline: number, refBackedCount: number,
+  physicalMismatch: boolean,
 ): string {
-  if (measureSim >= EXACT_MEASURE && schema >= EXACT_SCHEMA) return BAND_EXACT;
   const support = Math.max(schema, srcLogical);
   const hasEvidence = refBackedCount >= MIN_DUP_MEASURES;
-  // STRONG needs genuine measure *similarity* + supporting schema/source. High containment with low
-  // similarity (a small model whose few measures subset a larger one) is a SUBSET, handled below —
-  // not a co-equal duplicate. This stops schema/source overlap alone from manufacturing duplicates.
-  if (hasEvidence && measureSim >= STRONG_MEASURE && support >= STRONG_SUPPORT) return BAND_STRONG;
-  // SUBSET: trimmed copy. The matched-measure floor stops a companion model that merely shares a
-  // handful of base measures with a large one (e.g. FUAM_Item vs FUAM_Core) being mislabeled.
-  if (hasEvidence && contain >= SUBSET_CONTAIN && schema >= SUBSET_SCHEMA && measureSim < STRONG_MEASURE) return BAND_SUBSET;
+  // A confirmed physical-source mismatch (both sides have parsed physical-source evidence and it
+  // disagrees — e.g. two regional shards of the same template) rules out calling this pair
+  // consolidation-actionable, even when measures/schema look identical: merging across a genuine
+  // physical boundary can lose data or cross a regional/compliance line. It only gates the three
+  // consolidation bands — a mismatched pair still falls through to related/review/unrelated on its
+  // remaining evidence, it just can never be classified as an exact/strong/subset duplicate.
+  if (!physicalMismatch) {
+    if (measureSim >= EXACT_MEASURE && schema >= EXACT_SCHEMA) return BAND_EXACT;
+    // STRONG needs genuine measure *similarity* + supporting schema/source. High containment with low
+    // similarity (a small model whose few measures subset a larger one) is a SUBSET, handled below —
+    // not a co-equal duplicate. This stops schema/source overlap alone from manufacturing duplicates.
+    if (hasEvidence && measureSim >= STRONG_MEASURE && support >= STRONG_SUPPORT) return BAND_STRONG;
+    // SUBSET: trimmed copy. The matched-measure floor stops a companion model that merely shares a
+    // handful of base measures with a large one (e.g. FUAM_Item vs FUAM_Core) being mislabeled.
+    if (hasEvidence && contain >= SUBSET_CONTAIN && schema >= SUBSET_SCHEMA && measureSim < STRONG_MEASURE) return BAND_SUBSET;
+  }
   if (srcLogical >= RELATED_SOURCE && measureSim < RELATED_MEASURE) return BAND_RELATED;
   if (measureSim >= REVIEW_MEASURE) return BAND_REVIEW;
   if (headline >= REVIEW_HEADLINE) return BAND_REVIEW;
   return BAND_UNRELATED;
 }
 
-function warnings(a: ModelCard, b: ModelCard, physical: number): string[] {
+function warnings(a: ModelCard, b: ModelCard, physicalMismatch: boolean): string[] {
   const notes: string[] = [];
   if (a.hasRls !== b.hasRls) notes.push("different RLS (one model has row-level security, the other does not)");
-  if (a.hasCalcGroups !== b.hasCalcGroups) notes.push("different calculation groups");
-  if (applicable("source_physical", a, b) && physical < 1) notes.push("different physical source / endpoint");
+  // Skip the comparison when either side's calc-group status is unknown (Scanner-sourced) — an
+  // undefined-vs-false mismatch would be a false positive, not real evidence of a difference.
+  if (a.hasCalcGroups !== undefined && b.hasCalcGroups !== undefined && a.hasCalcGroups !== b.hasCalcGroups) {
+    notes.push("different calculation groups");
+  }
+  if (physicalMismatch) notes.push("different physical source / endpoint");
   return notes;
 }
 
@@ -119,12 +132,14 @@ export function scorePair(a: ModelCard, b: ModelCard, cards?: ModelCard[]): Pair
   const headline = wsum
     ? round4(active.reduce((s, n) => s + FACET_WEIGHTS[n] * (facets as Record<string, number>)[n], 0) / wsum)
     : 0;
+  const physicalMismatch = applicable("source_physical", a, b) && facets.source_physical < 1;
   const band = classifyBand(
     facets.measure, measure.containment, facets.schema, facets.source_logical, headline, measure.strongMatched,
+    physicalMismatch,
   );
   const lifecycle = isLifecycleCandidate(a, b) && facets.measure >= LIFECYCLE_MEASURE;
   const composite = isCompositeParentChild(a, b, cards);
-  return { a, b, facets, headline, band, lifecycle, composite, measure, warnings: warnings(a, b, facets.source_physical) };
+  return { a, b, facets, headline, band, lifecycle, composite, measure, warnings: warnings(a, b, physicalMismatch) };
 }
 
 export function scoreAll(cards: ModelCard[]): PairResult[] {

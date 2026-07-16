@@ -79,9 +79,13 @@ export function materialDrift(a: ModelCard, b: ModelCard): { drift: boolean; dim
     dims.push(`data types differ: ${typeConflicts.slice(0, 3).join(", ")}${typeConflicts.length > 3 ? "…" : ""}`);
   }
 
-  // 4/5. Security / calc-group presence mismatch.
+  // 4/5. Security / calc-group presence mismatch. Calc groups skip the comparison when either side
+  // is unknown (Scanner-sourced cards never know this — see ModelCard.hasCalcGroups) so an
+  // undefined-vs-false pairing is never reported as a genuine difference.
   if (a.hasRls !== b.hasRls) dims.push("RLS present on one side only");
-  if (a.hasCalcGroups !== b.hasCalcGroups) dims.push("calc groups present on one side only");
+  if (a.hasCalcGroups !== undefined && b.hasCalcGroups !== undefined && a.hasCalcGroups !== b.hasCalcGroups) {
+    dims.push("calc groups present on one side only");
+  }
 
   return { drift: dims.length > 0, dims };
 }
@@ -124,6 +128,20 @@ const BASE_PRIORITY: Record<RecAction, number> = {
   "insufficient-evidence": 15,
 };
 
+// How complete/trustworthy is our METADATA picture of this one card — independent of the
+// usage/lineage confidence scored alongside it. A full TMDL export knows relationships, calc
+// groups, and RLS definitively (fidelity 1). An admin Scanner scan never knows calc groups at all
+// (hasCalcGroups is undefined — the Scanner API's dataset schema has no such field, confirmed
+// against Microsoft's documented WorkspaceInfoDataset shape) and may itself flag the schema
+// retrieval as stale or failed; grading those down stops metadataFidelity=1 from overstating an
+// admin scan's confidence to the same level as a genuine TMDL export.
+function metadataFidelityOf(card: ModelCard): number {
+  if (card.schemaRetrievalError) return 0.4; // Scanner flagged the schema retrieval itself as failed
+  if (card.schemaMayNotBeUpToDate) return 0.7; // Scanner flagged the schema as possibly stale
+  if (card.hasCalcGroups === undefined) return 0.85; // Scanner-derived: some fields unknowable
+  return 1; // full TMDL export: relationships, calc groups, and RLS all known definitively
+}
+
 function recommendMember(
   member: ModelCard,
   keeper: ModelCard,
@@ -135,7 +153,7 @@ function recommendMember(
   const consumptionKnown = u != null && (u.distinctUsers90d != null || u.views90d != null);
   const lineageKnown = u?.downstreamReportCount != null;
   const usageLineage = u ? 0.4 + (consumptionKnown ? 0.3 : 0) + (lineageKnown ? 0.3 : 0) : 0;
-  const metadataFidelity = 1; // full TMDL model in 1a; Scanner-rich fidelity scoring is 1b
+  const metadataFidelity = round4(Math.min(metadataFidelityOf(member), metadataFidelityOf(keeper)));
   const overall = round4(Math.min(idJoin, usageLineage, metadataFidelity));
   const confidence: Confidence = { identityJoin: round4(idJoin), usageLineage: round4(usageLineage), metadataFidelity, overall };
 

@@ -23,12 +23,21 @@ export interface ModelCard {
   sourceLogical: Set<string>; // "schema\u0000entity"
   sourcePhysical: Set<string>; // "endpoint\u0000db"
   hasRls: boolean;
-  hasCalcGroups: boolean;
+  // `undefined` = genuinely unknown (e.g. a Scanner-API-sourced card: that payload's dataset schema
+  // has no calculation-group field at all), NOT "known false". Comparison sites must treat it as
+  // "can't tell" rather than as a known non-match — see engine/index.ts warnings() and
+  // engine/recommend.ts materialDrift().
+  hasCalcGroups: boolean | undefined;
   systemGenerated: boolean;
   // Slice 1a: optional identity (populated by a live Fabric scan) + joined usage overlay.
   datasetId?: string;
   workspaceId?: string;
   usage?: Usage;
+  // Scanner-reported schema-retrieval health (undefined for a TMDL-parsed card, or a clean scan).
+  // Feeds metadataFidelity in engine/recommend.ts — a stale/failed admin scan must not claim the
+  // same confidence as a full TMDL export.
+  schemaMayNotBeUpToDate?: boolean;
+  schemaRetrievalError?: string;
   // Composite / chained model: upstream semantic-model names this model DirectQueries. An explicit,
   // high-confidence "built on" link (not coincidental similarity).
   derivedFrom?: string[];

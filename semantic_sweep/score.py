@@ -85,22 +85,35 @@ def _applicable(name: str, a: ModelCard, b: ModelCard) -> bool:
 
 
 def _classify_band(
-    measure_sim: float, contain: float, schema: float, src_logical: float, headline: float, ref_backed_count: int
+    measure_sim: float,
+    contain: float,
+    schema: float,
+    src_logical: float,
+    headline: float,
+    ref_backed_count: int,
+    physical_mismatch: bool,
 ) -> str:
     # pylint: disable=too-many-return-statements,too-many-arguments,too-many-positional-arguments  # cohesive band cascade
-    if measure_sim >= _EXACT_MEASURE and schema >= _EXACT_SCHEMA:
-        return BAND_EXACT
     support = max(schema, src_logical)
     has_evidence = ref_backed_count >= _MIN_DUP_MEASURES
-    # STRONG needs genuine measure *similarity* + supporting schema/source. High containment with low
-    # similarity (a small model whose few measures subset a larger one) is a SUBSET, handled below --
-    # not a co-equal duplicate. This stops schema/source overlap alone from manufacturing duplicates.
-    if has_evidence and measure_sim >= _STRONG_MEASURE and support >= _STRONG_SUPPORT:
-        return BAND_STRONG
-    # SUBSET: trimmed copy. The matched-measure floor stops a companion model that merely shares a
-    # handful of base measures with a large one (e.g. FUAM_Item vs FUAM_Core) being mislabeled.
-    if has_evidence and contain >= _SUBSET_CONTAIN and schema >= _SUBSET_SCHEMA and measure_sim < _STRONG_MEASURE:
-        return BAND_SUBSET
+    # A confirmed physical-source mismatch (both sides have parsed physical-source evidence and it
+    # disagrees -- e.g. two regional shards of the same template) rules out calling this pair
+    # consolidation-actionable, even when measures/schema look identical: merging across a genuine
+    # physical boundary can lose data or cross a regional/compliance line. It only gates the three
+    # consolidation bands -- a mismatched pair still falls through to related/review/unrelated on
+    # its remaining evidence, it just can never be classified as an exact/strong/subset duplicate.
+    if not physical_mismatch:
+        if measure_sim >= _EXACT_MEASURE and schema >= _EXACT_SCHEMA:
+            return BAND_EXACT
+        # STRONG needs genuine measure *similarity* + supporting schema/source. High containment with low
+        # similarity (a small model whose few measures subset a larger one) is a SUBSET, handled below --
+        # not a co-equal duplicate. This stops schema/source overlap alone from manufacturing duplicates.
+        if has_evidence and measure_sim >= _STRONG_MEASURE and support >= _STRONG_SUPPORT:
+            return BAND_STRONG
+        # SUBSET: trimmed copy. The matched-measure floor stops a companion model that merely shares a
+        # handful of base measures with a large one (e.g. FUAM_Item vs FUAM_Core) being mislabeled.
+        if has_evidence and contain >= _SUBSET_CONTAIN and schema >= _SUBSET_SCHEMA and measure_sim < _STRONG_MEASURE:
+            return BAND_SUBSET
     if src_logical >= _RELATED_SOURCE and measure_sim < _RELATED_MEASURE:
         return BAND_RELATED
     if measure_sim >= _REVIEW_MEASURE:
@@ -110,13 +123,13 @@ def _classify_band(
     return BAND_UNRELATED
 
 
-def _warnings(a: ModelCard, b: ModelCard, facets: dict[str, float]) -> list[str]:
+def _warnings(a: ModelCard, b: ModelCard, physical_mismatch: bool) -> list[str]:
     notes: list[str] = []
     if a.has_rls != b.has_rls:
         notes.append("different RLS (one model has row-level security, the other does not)")
     if a.has_calc_groups != b.has_calc_groups:
         notes.append("different calculation groups")
-    if _applicable("source_physical", a, b) and facets["source_physical"] < 1.0:
+    if physical_mismatch:
         notes.append("different physical source / endpoint")
     return notes
 
@@ -133,6 +146,7 @@ def score_pair(a: ModelCard, b: ModelCard) -> PairResult:
     }
     active = [(name, weight) for name, weight in FACET_WEIGHTS.items() if _applicable(name, a, b)]
     headline = round4(sum(w * facets[name] for name, w in active) / sum(w for _, w in active)) if active else 0.0
+    physical_mismatch = _applicable("source_physical", a, b) and facets["source_physical"] < 1.0
     band = _classify_band(
         facets["measure"],
         measure.containment,
@@ -140,6 +154,7 @@ def score_pair(a: ModelCard, b: ModelCard) -> PairResult:
         facets["source_logical"],
         headline,
         measure.strong_matched,
+        physical_mismatch,
     )
     lifecycle = is_lifecycle_candidate(a, b) and facets["measure"] >= _LIFECYCLE_MEASURE
     return PairResult(
@@ -150,7 +165,7 @@ def score_pair(a: ModelCard, b: ModelCard) -> PairResult:
         band=band,
         lifecycle=lifecycle,
         measure=measure,
-        warnings=_warnings(a, b, facets),
+        warnings=_warnings(a, b, physical_mismatch),
     )
 
 
