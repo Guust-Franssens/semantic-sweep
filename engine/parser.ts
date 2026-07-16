@@ -12,35 +12,40 @@ const USAGE_METRICS_RE = /usage\s*metrics/i;
 // One connection arg: a literal string value, OR a bare identifier (an M query parameter / let-bound
 // name, e.g. `Sql.Database(ServerParam, DatabaseParam)`) captured symbolically so parameterized
 // connections still contribute comparable physical-source evidence instead of being silently dropped.
-const ARG_SRC = String.raw`(?:"([^"]+)"|(\w+))`;
+// The identifier alternative uses `\p{L}\p{N}_` (Unicode letters/digits/underscore) rather than `\w`,
+// which in JS regex is ASCII-only (unlike Python's `\w`, Unicode-aware by default) — without this, a
+// non-ASCII parameter name (e.g. "MonParamètre", "über") would be silently truncated at the first
+// accented character, diverging from the Python engine's parse of the exact same model.
+const ARG_SRC = String.raw`(?:"([^"]+)"|([\p{L}\p{N}_]+))`;
 // `\b` matters here: without it "Sql.Database(" also matches inside "PostgreSQL.Database(" and
 // "MySQL.Database(" (both connector names literally end in "...SQL"), miscategorizing those sources
 // as SQL Server. PostgreSQL and MySQL get their own dedicated (and correctly `\b`-anchored) regexes
 // below so this fix doesn't silently drop coverage that previously worked only by substring accident.
-const SQL_DATABASE_RE = new RegExp(String.raw`\bSql\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC, "gi");
+// All ARG_SRC-consuming regexes carry the `u` flag: required for `\p{...}` Unicode property escapes.
+const SQL_DATABASE_RE = new RegExp(String.raw`\bSql\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC, "giu");
 const POSTGRESQL_RE = new RegExp(
   String.raw`\bPostgreSQL\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC,
-  "gi",
+  "giu",
 );
-const MYSQL_RE = new RegExp(String.raw`\bMySQL\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC, "gi");
+const MYSQL_RE = new RegExp(String.raw`\bMySQL\.Database\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC, "giu");
 const SNOWFLAKE_RE = new RegExp(
   String.raw`\bSnowflake\.Databases?\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC,
-  "gi",
+  "giu",
 );
 const DATABRICKS_RE = new RegExp(
   String.raw`\bDatabricks\.Catalogs\(\s*` + ARG_SRC + String.raw`\s*,\s*` + ARG_SRC,
-  "gi",
+  "giu",
 );
 // BigQuery rarely carries a comparable 2-arg identity (often zero args, or an options record); capture
 // a single literal/identifier arg (billing project) when present, else there's nothing to fingerprint.
-const BIGQUERY_RE = new RegExp(String.raw`\bGoogleBigQuery\.Database\(\s*` + ARG_SRC + "?", "gi");
+const BIGQUERY_RE = new RegExp(String.raw`\bGoogleBigQuery\.Database\(\s*` + ARG_SRC + "?", "giu");
 // File-based connectors: the file path is the physical identity. Only a simple literal path or a
 // single bare parameter reference is captured; a concatenation expression (e.g. folder & name &
 // ".csv") is dynamic per-row/per-parameter and cannot be fingerprinted statically.
-const CSV_RE = new RegExp(String.raw`\bCsv\.Document\(\s*File\.Contents\(\s*` + ARG_SRC + String.raw`\s*\)`, "gi");
+const CSV_RE = new RegExp(String.raw`\bCsv\.Document\(\s*File\.Contents\(\s*` + ARG_SRC + String.raw`\s*\)`, "giu");
 const PARQUET_RE = new RegExp(
   String.raw`\bParquet\.Document\(\s*File\.Contents\(\s*` + ARG_SRC + String.raw`\s*\)`,
-  "gi",
+  "giu",
 );
 // Bare M parameter names common enough in templated connection setups (e.g. every environment's model
 // has a query parameter literally called "Server"/"Database") that a shared PARAMETER NAME alone (not
@@ -55,7 +60,7 @@ const GENERIC_PARAM_NAMES = new Set([
 // still matches; a literal-only regex silently fails on this common templated-connection idiom.
 const ANALYSIS_SERVICES_RE = new RegExp(
   String.raw`\bAnalysisServices\.Databases?\(\s*` + ARG_SRC + String.raw`(?:\s*,\s*` + ARG_SRC + `)?`,
-  "gi",
+  "giu",
 );
 // Fabric/PBI DirectQuery-to-dataset via the dedicated connector (e.g. PowerBIDatasets / PowerPlatform.Dataflows-style).
 const PBI_DATASETS_RE = /PowerBIDatasets\s*\(/i;

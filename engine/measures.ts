@@ -71,7 +71,10 @@ export function normalizeDax(dax: string): string {
 }
 
 function skeleton(norm: string): string {
-  let text = norm.replace(/(?:'[^']*'|\w+)?\[[^\]]*\]/g, "#r#");
+  // `[\p{L}\p{N}_]` (+ `u` flag) rather than `\w`: JS's `\w` is ASCII-only, unlike Python's (Unicode-aware
+  // by default), so a non-ASCII bare table qualifier (e.g. `Clientèle[Amount]`) would otherwise be split
+  // mid-identifier here, diverging from the Python engine's parse of the identical DAX expression.
+  let text = norm.replace(/(?:'[^']*'|[\p{L}\p{N}_]+)?\[[^\]]*\]/gu, "#r#");
   text = text.replace(STRING_RE, "#s#");
   text = text.replace(/\b\d+(?:\.\d+)?\b/g, "#n#");
   return text.replace(/\s+/g, "");
@@ -93,7 +96,8 @@ function matchAll(re: RegExp, text: string, group = 0): string[] {
 // a measure call) contributes nothing here -- it stays in the unqualified `refs` set instead.
 function extractQualifiedRefs(text: string): Set<string> {
   const out = new Set<string>();
-  const re = /(?:'([^']*)'|(\w+))?\[([^\]]+)\]/g;
+  // Same Unicode-aware fix as skeleton() above: `[\p{L}\p{N}_]` + `u` flag instead of ASCII-only `\w`.
+  const re = /(?:'([^']*)'|([\p{L}\p{N}_]+))?\[([^\]]+)\]/gu;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const qualifier = m[1] ?? m[2];

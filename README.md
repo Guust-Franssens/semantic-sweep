@@ -123,7 +123,7 @@ matched measures + side-by-side DAX diff). Ships as a single self-contained HTML
 ```bash
 cd app
 npm install
-npm run validate    # confirm TS engine == Python engine on ../models
+npm run validate    # confirm TS engine == Python engine on the committed sample_models/ fixture
 npm run build       # -> app/dist/index.html (single self-contained file)
 ```
 Also shipped as a **Rayfin Fabric App** (`rayfin-app/`) — managed hosting + Entra SSO for live,
@@ -134,13 +134,14 @@ in-tenant estate scans (that's the app shown in the tour above).
 semantic_sweep/   Python engine — parser · measures · lifecycle · score · report · cli
 engine/           TypeScript engine — parity-checked against the Python engine
 scripts/          enumerate_estate · export_models · make_sample_models · make_seed_models
-                  · deploy_seed · teardown_seed · build_dashboard
+                  · deploy_seed · teardown_seed · build_dashboard · make_parity_fixture
 sample_models/    synthetic, graded-overlap models for scoring calibration (committed)
 seed_models/      synthetic, deployable near-duplicate control set (committed)
 composite_demo/   synthetic composite (chained) semantic models for link detection
 models/           exported TMDL (gitignored — real tenant metadata, never committed)
 out/              report.md · results.json · similarity_matrix.csv (gitignored)
 tests/            DAX sanity matrix · smoke tests · calibration · precision
+                  · fixtures/ (committed sample_models.results.json — TS/Python parity reference)
 app/              React+TS SPA — drop-a-zip, fully client-side engine + UI; single-file build
 rayfin-app/       Rayfin Fabric App — live estate scan (Entra SSO, admin + per-user paths)
 ```

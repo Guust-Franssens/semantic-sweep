@@ -115,6 +115,15 @@ describe("source-physical parser broadening", () => {
     const card = cardFor("Sql.Database(Server, Database)");
     expect(card.sourcePhysical.size).toBe(0); // "Server"/"Database" alone are template placeholders, not evidence
   });
+
+  // fix-parity-harness: JS's `\w` is ASCII-only regardless of regex flags, unlike Python's `\w`
+  // (Unicode-aware by default) -- a non-ASCII M-query parameter name (plausible on a non-English
+  // tenant) previously matched only its ASCII prefix here, diverging from the Python engine's parse
+  // of the identical model. Fixed via `[\p{L}\p{N}_]` + the `u` flag on every ARG_SRC-consuming regex.
+  it("captures a full non-ASCII parameterized Sql.Database(Server, Database) call", () => {
+    const card = cardFor("Sql.Database(ServeurClientÉ, MonParamètre)");
+    expect(card.sourcePhysical.has("serveurclienté\u0000monparamètre")).toBe(true);
+  });
 });
 
 // dax-tokenizer-hardening: readColumn previously found a quoted name's closing "'" via

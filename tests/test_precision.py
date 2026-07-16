@@ -17,7 +17,7 @@ Kept in lockstep with ``engine/measures.ts`` / ``engine/index.ts`` so TS and Pyt
 
 from pathlib import Path
 
-from semantic_sweep.measures import extract_features, match_model_measures
+from semantic_sweep.measures import extract_features, match_model_measures, round4
 from semantic_sweep.parser import Measure, load_models
 from semantic_sweep.score import (
     BAND_EXACT,
@@ -133,6 +133,27 @@ def test_generic_bare_ref_across_unrelated_tables_is_not_ref_backed():
     match = match_model_measures(a, b)
     assert len(match.matched) >= 3
     assert match.strong_matched == 0
+
+
+def test_non_ascii_table_qualifier_captured_in_full():
+    # fix-parity-harness: Python's `\w` is Unicode-aware by default, so "Clientèle[Montant]" was
+    # already captured correctly here -- this pins that behavior down explicitly as the REFERENCE
+    # the TS engine (previously ASCII-only `\w`, fixed in engine/measures.ts) must match.
+    feats = extract_features("SUM(Clientèle[Montant])")
+    assert "clientèle.montant" in feats.qualified_refs
+
+
+def test_round4_matches_js_math_round_tie_behavior():
+    # fix-parity-harness: Python's builtin round() is banker's-rounding (ties-to-even) and disagrees
+    # with the TS engine's round4 (Math.round-based, ties-away-from-zero) on exact 4th-decimal ties,
+    # e.g. round(0.03125, 4) == 0.0312 in Python but the TS engine produces 0.0313. round4() must
+    # reproduce the TS result for every score/facet value (all non-negative, so round-half-up is
+    # unambiguous).
+    assert round(0.03125, 4) == 0.0312  # documents the builtin's divergence this helper fixes
+    assert round4(0.03125) == 0.0313
+    assert round4(5 / 32) == 0.1563  # 0.15625 -> Python round() gives 0.1562, JS gives 0.1563
+    assert round4(0.11115) == 0.1112
+    assert round4(0.06255) == 0.0626
 
 
 def test_date_hub_does_not_bridge_supersets(tmp_path):

@@ -9,6 +9,7 @@ credit** (``ROUND`` vs ``TRUNC``). Models are then matched greedily one-to-one.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 
@@ -233,6 +234,16 @@ def _jaccard(a: frozenset[str], b: frozenset[str]) -> float:
     return len(a & b) / len(a | b)
 
 
+def round4(x: float) -> float:
+    """Round to 4 decimals using round-half-up, matching the TS engine's ``Math.round``-based
+    ``round4`` (engine/types.ts). Python's builtin ``round()`` uses banker's rounding (ties-to-even),
+    which disagrees with JS on exact 4th-decimal ties -- e.g. ``round(0.03125, 4)`` is ``0.0312`` in
+    Python but ``0.0313`` in JS. Every value passed here (jaccard ratios, weighted headline scores)
+    is non-negative, so round-half-up is unambiguous and reproduces the JS result exactly.
+    """
+    return math.floor(x * 10000 + 0.5) / 10000
+
+
 def _function_similarity(a: frozenset[str], b: frozenset[str]) -> float:
     """Jaccard over functions, but same-family functions (round/trunc) get half credit."""
     if not a and not b:
@@ -253,7 +264,7 @@ def measure_similarity(a: DaxFeatures, b: DaxFeatures) -> float:
     if a.norm == b.norm:
         return 1.0
     if a.skeleton and a.skeleton == b.skeleton:
-        return round(_SKELETON_FLOOR + (_SKELETON_SCORE - _SKELETON_FLOOR) * _jaccard(a.refs, b.refs), 4)
+        return round4(_SKELETON_FLOOR + (_SKELETON_SCORE - _SKELETON_FLOOR) * _jaccard(a.refs, b.refs))
     scores = {
         "refs": _jaccard(a.refs, b.refs),
         "functions": _function_similarity(a.functions, b.functions),
@@ -272,7 +283,7 @@ def measure_similarity(a: DaxFeatures, b: DaxFeatures) -> float:
     base = sum(w * scores[k] for k, w in active) / sum(w for _, w in active)
     if a.aggregators and b.aggregators and a.aggregators.isdisjoint(b.aggregators) and (a.refs & b.refs):
         base *= _AGG_PENALTY  # SUM(x) vs AVERAGE(x): same column, incompatible aggregator
-    return round(min(1.0, base), 4)
+    return round4(min(1.0, base))
 
 
 def _measure_weight(measure: Measure, feats: DaxFeatures) -> float:
@@ -343,8 +354,8 @@ def match_model_measures(
     similarity = matched_weight / max(total_a, total_b) if max(total_a, total_b) else 0.0
     containment = matched_weight / min(total_a, total_b) if min(total_a, total_b) else 0.0
     return MeasureMatch(
-        similarity=round(similarity, 4),
-        containment=round(min(1.0, containment), 4),
+        similarity=round4(similarity),
+        containment=round4(min(1.0, containment)),
         matched=matched,
         strong_matched=strong_matched,
     )

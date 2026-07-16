@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from semantic_sweep.lifecycle import classify_workspace, is_lifecycle_candidate
-from semantic_sweep.measures import MeasureMatch, match_model_measures
+from semantic_sweep.measures import MeasureMatch, match_model_measures, round4
 from semantic_sweep.parser import ModelCard
 
 FACET_WEIGHTS = {"measure": 0.40, "schema": 0.20, "source_logical": 0.22, "source_physical": 0.08, "rel": 0.10}
@@ -66,7 +66,7 @@ def _jaccard(a: set, b: set) -> float:
 def _schema_score(a: ModelCard, b: ModelCard) -> float:
     tables = _jaccard({t.lower() for t in a.tables}, {t.lower() for t in b.tables})
     columns = _jaccard(a.qualified_columns, b.qualified_columns)
-    return round((tables + columns) / 2, 4)
+    return round4((tables + columns) / 2)
 
 
 def _applicable(name: str, a: ModelCard, b: ModelCard) -> bool:
@@ -127,12 +127,12 @@ def score_pair(a: ModelCard, b: ModelCard) -> PairResult:
     facets = {
         "measure": measure.similarity,
         "schema": _schema_score(a, b),
-        "source_logical": round(_jaccard(a.source_logical, b.source_logical), 4),
-        "source_physical": round(_jaccard(a.source_physical, b.source_physical), 4),
-        "rel": round(_jaccard(set(a.relationships), set(b.relationships)), 4),
+        "source_logical": round4(_jaccard(a.source_logical, b.source_logical)),
+        "source_physical": round4(_jaccard(a.source_physical, b.source_physical)),
+        "rel": round4(_jaccard(set(a.relationships), set(b.relationships))),
     }
     active = [(name, weight) for name, weight in FACET_WEIGHTS.items() if _applicable(name, a, b)]
-    headline = round(sum(w * facets[name] for name, w in active) / sum(w for _, w in active), 4) if active else 0.0
+    headline = round4(sum(w * facets[name] for name, w in active) / sum(w for _, w in active)) if active else 0.0
     band = _classify_band(
         facets["measure"],
         measure.containment,

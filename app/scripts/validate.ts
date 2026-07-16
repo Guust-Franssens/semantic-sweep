@@ -1,4 +1,7 @@
-// Parity check: run the TS engine on ../models and diff against the Python out/results.json.
+// Parity check: run the TS engine on sample_models/ and diff against the committed Python-reference
+// tests/fixtures/sample_models.results.json. Both are tracked in git, so this runs standalone from a
+// fresh clone with zero external setup (previously required a private, gitignored ../models estate
+// and a gitignored out/results.json -- see scripts/make_parity_fixture.py to regenerate the fixture).
 // Usage: npx tsx scripts/validate.ts
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -6,7 +9,7 @@ import { runScan, toResults } from "../../engine/scan";
 import type { InputFile } from "../../engine/parser";
 
 const REPO = join(process.cwd(), "..");
-const MODELS = join(REPO, "models");
+const MODELS = join(REPO, "sample_models");
 
 function walk(dir: string, files: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -22,7 +25,7 @@ const inputs: InputFile[] = walk(MODELS)
   .map((p) => ({ path: relative(MODELS, p).split(sep).join("/"), text: readFileSync(p, "utf-8") }));
 
 const ts = toResults(runScan(inputs)) as any;
-const py = JSON.parse(readFileSync(join(REPO, "out", "results.json"), "utf-8"));
+const py = JSON.parse(readFileSync(join(REPO, "tests", "fixtures", "sample_models.results.json"), "utf-8"));
 
 let problems = 0;
 const check = (label: string, a: unknown, b: unknown): void => {

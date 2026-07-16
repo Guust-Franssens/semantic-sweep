@@ -118,6 +118,24 @@ describe("precision — acc6 generic bare refs are not ref-backed across tables"
   });
 });
 
+describe("fix-parity-harness — Unicode-aware table qualifiers", () => {
+  // JS's `\w` is ASCII-only regardless of regex flags, unlike Python's `\w` (Unicode-aware by
+  // default) -- engine/measures.ts previously used `\w+` for the bare table-qualifier alternative in
+  // its bracket-reference regexes, so a non-ASCII table name split the qualifier mid-identifier and
+  // diverged from the Python engine's parse of the exact same DAX. Fixed via `[\p{L}\p{N}_]` + `u`.
+  it("captures a full non-ASCII bare table qualifier, not a truncated fragment", () => {
+    const accented = extractFeatures("SUM(Clientèle[Montant])");
+    expect(accented.qualifiedRefs.has("clientèle.montant")).toBe(true);
+  });
+
+  it("treats a shared non-ASCII column name across two non-ASCII tables as ref-backed strong evidence", () => {
+    const a: Measure[] = [{ name: "M", dax: "SUM(Übersicht[Größe])" }];
+    const b: Measure[] = [{ name: "M", dax: "SUM(Zusammenfassung[Größe])" }];
+    const m = matchModelMeasures(a, b);
+    expect(m.strongMatched).toBe(1);
+  });
+});
+
 describe("precision — acc5 ref-backed strong evidence", () => {
   it("counts a shape-only skeleton match as review evidence, not strong-duplicate evidence", () => {
     // SUM(Sales[a_i]) vs SUM(HR[b_i]): identical skeleton, DISJOINT refs. They match structurally
