@@ -96,6 +96,31 @@ describe("dax-tokenizer-hardening — escape-aware strings and comments", () => 
   });
 });
 
+describe("remove-em-dashes-and-precision-recall — greedy matcher no longer under-counts", () => {
+  it("finds the mutually-compatible optimal assignment instead of the single best-scoring pair", () => {
+    // The old greedy matcher sorted ALL candidate pairs by score descending and assigned
+    // first-come-first-served. That under-counts matches whenever a contested measure's single
+    // best candidate blocks a DIFFERENT, mutually-compatible assignment that would have matched
+    // everyone. Here A0's top choice (B0, 1.0) beats A1's ONLY viable candidate (B0, 0.8824) and
+    // A1~B1 falls below threshold (0.3529, no candidate at all) -- so a score-descending greedy
+    // pass grabs A0-B0 first, then drops both A1~B0 (B0 taken) and A0~B1 (A0 taken), leaving A1
+    // completely unmatched even though A0-B1 (0.9) + A1-B0 (0.8824) matches BOTH measures on each
+    // side. The matcher must find that second, better assignment.
+    const a: Measure[] = [
+      { name: "A0", dax: "SUM(Sales[Amount])" },
+      { name: "A1", dax: "SUM(Sales[Amount]) * 1" },
+    ];
+    const b: Measure[] = [
+      { name: "B0", dax: "SUM(Sales[Amount])" },
+      { name: "B1", dax: "SUM(Revenue[Units])" },
+    ];
+    const m = matchModelMeasures(a, b);
+    expect(m.matched.length).toBe(2); // both sides fully matched, not just the single best pair
+    const pairs = new Set(m.matched.map(({ a: x, b: y }) => `${x}~${y}`));
+    expect(pairs).toEqual(new Set(["A0~B1", "A1~B0"])); // the mutually-compatible optimal assignment
+  });
+});
+
 describe("precision — acc6 generic bare refs are not ref-backed across tables", () => {
   it("captures a table-qualified ref only when a qualifier is present in the source DAX", () => {
     const qualified = extractFeatures("SUM(Sales[Amount])");
@@ -115,6 +140,35 @@ describe("precision — acc6 generic bare refs are not ref-backed across tables"
     const m = matchModelMeasures(a, b);
     expect(m.matched.length).toBeGreaterThanOrEqual(3);
     expect(m.strongMatched).toBe(0);
+  });
+});
+
+describe("remove-em-dashes-and-precision-recall — generic multi-word name downweight", () => {
+  it("gives a partly generic name a partial, not zero, downweight versus a fully generic or fully specific name", () => {
+    // measureWeight() used to strip ALL non-alphanumeric chars (including spaces) before the
+    // GENERIC_NAMES check, so "Total Sales" collapsed to "totalsales" and matched nothing -> never
+    // downweighted, identical to a fully specific name like "Revenue". Word-boundary tokenization
+    // now judges each word independently, so a partly generic name sits strictly BETWEEN a fully
+    // generic name and a fully specific one.
+    //
+    // Each case matches one measure with identical DAX on both sides (so DAX complexity is constant
+    // across cases) plus an unmatched, non-generic filler on side A only, so the matched measure's
+    // weight is exposed through the similarity normalization instead of always resolving to 1.0.
+    const filler: Measure = { name: "Extra Metric", dax: "DISTINCTCOUNT(Customer[Id])" };
+    const similarity = (name: string): number => {
+      const a: Measure[] = [{ name, dax: "SUM(Sales[Amount])" }, filler];
+      const b: Measure[] = [{ name, dax: "SUM(Sales[Amount])" }];
+      return matchModelMeasures(a, b).similarity;
+    };
+
+    const simGeneric = similarity("Total"); // fully generic word -> full 0.4 floor (unchanged)
+    const simPartial = similarity("Total Sales"); // one generic + one specific word
+    const simSpecific = similarity("Revenue"); // no generic words -> no downweight
+
+    expect(simGeneric).toBeLessThan(simPartial);
+    expect(simPartial).toBeLessThan(simSpecific);
+    // Before the fix simPartial === simSpecific exactly (both treated as fully non-generic).
+    expect(simSpecific - simPartial).toBeGreaterThan(0.02);
   });
 });
 

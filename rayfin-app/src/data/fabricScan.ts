@@ -52,7 +52,7 @@ export async function scanFabricEstate(
   // silently vanishing from the estate.
   onProgress(0, 0, "Listing workspaces you can access…");
   const ws = await listWorkspaces(provider);
-  onProgress(0, 0, `Found ${ws.length} workspaces — discovering models…`);
+  onProgress(0, 0, `Found ${ws.length} workspaces, discovering models…`);
   const { files, failures } = await exportWorkspaces(provider, ws, onProgress);
   if (files.length === 0) {
     throw new Error(`No models could be exported. ${failures[0]?.reason ?? "Check the workspaces have semantic models."}`);

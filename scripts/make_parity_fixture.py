@@ -14,7 +14,7 @@ from pathlib import Path
 
 from semantic_sweep.parser import load_models
 from semantic_sweep.report import build_results
-from semantic_sweep.score import score_all
+from semantic_sweep.score import dedupe_model_ids, score_all
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "sample_models"
@@ -26,7 +26,7 @@ def main() -> None:
     # Regenerated via subprocess (not a direct import) to match the established tests/test_calibration.py
     # convention -- scripts/ has no __init__.py, so it is not meant to be imported as a package.
     subprocess.run([sys.executable, str(ROOT / "scripts" / "make_sample_models.py")], cwd=ROOT, check=True)
-    cards = load_models(SAMPLE)
+    cards = dedupe_model_ids(load_models(SAMPLE))
     pairs = score_all(cards)
     results = build_results(cards, pairs, unscored=[])
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)

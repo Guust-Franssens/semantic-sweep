@@ -136,7 +136,7 @@ interface DefinitionPart {
 
 function cleanReason(raw: string): string {
   const low = raw.toLowerCase();
-  if (low.includes("direct lake")) return "Direct Lake — needs an active capacity";
+  if (low.includes("direct lake")) return "Direct Lake, needs an active capacity";
   if (low.includes("capacity")) return "capacity paused / unavailable";
   if (low.includes("forbidden") || low.includes("401") || low.includes("403")) return "no access";
   return raw.slice(0, 80);

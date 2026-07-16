@@ -193,7 +193,7 @@ export function App() {
         )}
 
         <h2>Duplicate consolidation candidates</h2>
-        <p className="sub">Cross-team models computing the same thing — the consolidation wins. Decision support: a human confirms.</p>
+        <p className="sub">Cross-team models computing the same thing: the consolidation wins. Decision support: a human confirms.</p>
         <LegendBar />
         <Clusters clusters={scan.clusters} labels={labels} onWhy={setWhy} />
 
@@ -203,7 +203,7 @@ export function App() {
         <Heatmap cards={scan.cards} pairs={scan.pairs} labels={labels} onSelect={setWhy} onModel={setModel} />
 
         <h2>Promotion chains (dev / test / prod)</h2>
-        <p className="sub">Same model promoted across environments — expected, not a consolidation target. Drift = numbers may differ across stages.</p>
+        <p className="sub">Same model promoted across environments: expected, not a consolidation target. Drift = numbers may differ across stages.</p>
         <Chains chains={scan.chains} labels={labels} />
 
         <h2>Related / needs review</h2>

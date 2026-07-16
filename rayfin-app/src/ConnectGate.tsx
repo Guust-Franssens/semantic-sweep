@@ -85,7 +85,7 @@ export function ConnectGate({
         /consent|AADSTS65001|need admin/i.test(msg)
           ? "This app needs a one-time Entra admin consent before it can read your estate."
           : /timed_out|user_cancelled|cancelled/i.test(msg)
-            ? "Sign-in was cancelled or timed out — try again."
+            ? "Sign-in was cancelled or timed out, try again."
             : msg,
       );
       setBusy(false);
@@ -135,7 +135,7 @@ export function ConnectGate({
                 className="inline-flex cursor-help items-center gap-[7px] rounded-full border border-border bg-card px-[13px] py-[5px] text-[12px] font-semibold text-muted-foreground"
               >
                 <Users size={14} /> Standard access · your workspaces
-                <span className="text-[11px] font-normal opacity-70">— why?</span>
+                <span className="text-[11px] font-normal opacity-70">(why?)</span>
               </span>
             )}
           </div>

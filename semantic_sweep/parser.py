@@ -128,6 +128,13 @@ class ModelCard:  # pylint: disable=too-many-instance-attributes
         return {c.qualified for c in self.columns}
 
 
+def model_id(card: ModelCard) -> str:
+    """Stable identity key for a card. No true unique id is always available (a TMDL-zip upload has
+    none), so this is workspace+name — callers that build a batch of cards must guarantee uniqueness
+    themselves, see score.dedupe_model_ids."""
+    return f"{card.workspace}/{card.name}"
+
+
 def _read_measure(lines: list[str], i: int) -> tuple[Measure, int]:
     """Read one measure starting at line ``i``; return it and the next line index."""
     line = lines[i]

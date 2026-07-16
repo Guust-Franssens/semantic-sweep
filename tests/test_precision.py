@@ -135,6 +135,55 @@ def test_generic_bare_ref_across_unrelated_tables_is_not_ref_backed():
     assert match.strong_matched == 0
 
 
+def test_greedy_matcher_no_longer_under_counts_contested_matches():
+    # remove-em-dashes-and-precision-recall: the old greedy matcher sorted ALL candidate pairs by
+    # score descending and assigned first-come-first-served. That under-counts matches whenever a
+    # contested measure's single best candidate blocks a DIFFERENT, mutually-compatible assignment
+    # that would have matched everyone. Here A0's top choice (B0, 1.0) beats A1's ONLY viable
+    # candidate (B0, 0.8824) and A1~B1 falls below threshold (0.3529, no candidate at all) -- so a
+    # score-descending greedy pass grabs A0-B0 first, then drops both A1~B0 (B0 taken) and A0~B1
+    # (A0 taken), leaving A1 completely unmatched even though A0-B1 (0.9) + A1-B0 (0.8824) matches
+    # BOTH measures on each side. The matcher must find that second, better assignment.
+    a = [
+        Measure(name="A0", dax="SUM(Sales[Amount])"),
+        Measure(name="A1", dax="SUM(Sales[Amount]) * 1"),
+    ]
+    b = [
+        Measure(name="B0", dax="SUM(Sales[Amount])"),
+        Measure(name="B1", dax="SUM(Revenue[Units])"),
+    ]
+    match = match_model_measures(a, b)
+    assert len(match.matched) == 2  # both sides fully matched, not just the single best pair
+    pairs = {(x, y) for x, y, _ in match.matched}
+    assert pairs == {("A0", "B1"), ("A1", "B0")}  # the mutually-compatible optimal assignment
+
+
+def test_generic_multiword_name_gets_partial_not_zero_downweight():
+    # remove-em-dashes-and-precision-recall: _measure_weight() used to strip ALL non-alphanumeric
+    # chars (including spaces) before the GENERIC_NAMES check, so "Total Sales" collapsed to
+    # "totalsales" and matched nothing -> never downweighted, identical to a fully specific name
+    # like "Revenue". Word-boundary tokenization now judges each word independently, so a partly
+    # generic name sits strictly BETWEEN a fully generic name and a fully specific one.
+    #
+    # Each case matches one measure with identical DAX on both sides (so DAX complexity is constant
+    # across cases) plus an unmatched, non-generic filler on side A only, so the matched measure's
+    # weight is exposed through the similarity normalization instead of always resolving to 1.0.
+    filler = [Measure(name="Extra Metric", dax="DISTINCTCOUNT(Customer[Id])")]
+
+    def _similarity(name: str) -> float:
+        a = [Measure(name=name, dax="SUM(Sales[Amount])"), *filler]
+        b = [Measure(name=name, dax="SUM(Sales[Amount])")]
+        return match_model_measures(a, b).similarity
+
+    sim_generic = _similarity("Total")  # fully generic word -> full 0.4 floor (unchanged behavior)
+    sim_partial = _similarity("Total Sales")  # one generic + one specific word
+    sim_specific = _similarity("Revenue")  # no generic words -> no downweight
+
+    assert sim_generic < sim_partial < sim_specific
+    # Before the fix sim_partial == sim_specific exactly (both treated as fully non-generic).
+    assert sim_specific - sim_partial > 0.02
+
+
 def test_non_ascii_table_qualifier_captured_in_full():
     # fix-parity-harness: Python's `\w` is Unicode-aware by default, so "Clientèle[Montant]" was
     # already captured correctly here -- this pins that behavior down explicitly as the REFERENCE

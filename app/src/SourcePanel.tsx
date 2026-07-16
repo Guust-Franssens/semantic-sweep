@@ -128,7 +128,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
         setToken(await acquireToken()); // surface a fresh token + fail early if the session is gone
         provider = (o) => acquireToken(o); // refreshable: the fetch layer renews it on a mid-scan 401
       } catch (e) {
-        return toast(`Session expired — sign in again: ${String(e)}`, "err");
+        return toast(`Session expired, sign in again: ${String(e)}`, "err");
       }
     } else {
       provider = () => Promise.resolve(token); // pasted token — can't be renewed
@@ -157,13 +157,13 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
     try {
       const scan = await scanTenantAdmin(() => Promise.resolve(token), (done, total, label) => setProgress({ done, total, label }));
       if (scan.cards.length === 0) {
-        toast("Admin scan returned no models — are you a Fabric/Power BI admin?", "err");
+        toast("Admin scan returned no models: are you a Fabric/Power BI admin?", "err");
       } else {
         onScan(scan, `Fabric tenant · admin scan · ${scan.cards.length} models`);
         toast(`Scanned ${scan.cards.length} models tenant-wide.`, "ok");
       }
     } catch (e) {
-      toast(`Admin scan failed: ${String(e)} — the admin API may block browser CORS (needs a proxy).`, "err");
+      toast(`Admin scan failed: ${String(e)}. The admin API may block browser CORS (needs a proxy).`, "err");
     } finally {
       setProgress(null);
     }
@@ -216,7 +216,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
 
   function applyMapped(): void {
     const records = buildUsageRecords(uRows, uMapping);
-    if (records.length === 0) return toast("No rows have a dataset name — map the 'Dataset / model name' column.", "err");
+    if (records.length === 0) return toast("No rows have a dataset name: map the 'Dataset / model name' column.", "err");
     onApplyUsage(records);
   }
 
@@ -248,17 +248,17 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
       {tab === "fabric" && (
         <div className="tab-body">
           <div className="hint">
-            Scan your tenant directly — models are exported and scored <strong>in your browser</strong>; nothing is uploaded.
+            Scan your tenant directly: models are exported and scored <strong>in your browser</strong>; nothing is uploaded.
           </div>
           <label className="admin-toggle">
             <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} /> Whole-tenant scan
-            (admin Scanner API) — no consent needed
+            (admin Scanner API), no consent needed
           </label>
 
           {admin && (
             <div className="admin-box">
               <div className="hint">
-                Uses the <strong>Admin Scanner API</strong> (you're Fabric Administrator) — reads every workspace's
+                Uses the <strong>Admin Scanner API</strong> (you're Fabric Administrator), reads every workspace's
                 models with <strong>no app registration or consent</strong>. Paste a <strong>Power BI</strong> admin
                 token:
                 <code>{AZ_CMD_PBI}</code>
@@ -304,7 +304,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
             open={showSetup}
             onToggle={(e) => setShowSetup((e.currentTarget as HTMLDetailsElement).open)}
           >
-            <summary>⚙ Sign-in setup (Entra app — one-time)</summary>
+            <summary>⚙ Sign-in setup (Entra app, one-time)</summary>
             <div className="hint">
               Register an Entra app as a <strong>Single-page application</strong> with redirect URI{" "}
               <code>{location.origin}</code>, grant a delegated Fabric permission, then paste its IDs:
@@ -378,7 +378,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
       {tab === "folder" && (
         <div className="tab-body">
           <div className="hint">
-            Point at your exported <code>models</code> folder, or a <code>.zip</code> of it — parsed and scored
+            Point at your exported <code>models</code> folder, or a <code>.zip</code> of it: parsed and scored
             entirely in your browser. Export with <code>fab export "&lt;ws&gt;.Workspace/&lt;model&gt;.SemanticModel" -o models</code>.
           </div>
           <div className="row">
@@ -407,7 +407,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
 
       {tab === "sample" && (
         <div className="tab-body">
-          <div className="hint">Load the built-in brewery control set — a labeled near-duplicate demo (no data leaves your machine).</div>
+          <div className="hint">Load the built-in brewery control set: a labeled near-duplicate demo (no data leaves your machine).</div>
           <button className="btn primary" onClick={onSample}>Load sample estate</button>
         </div>
       )}
@@ -447,7 +447,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
                   <label className="map-row" key={f}>
                     <span className="map-label">{FIELD_LABELS[f]}</span>
                     <select value={uMapping[f] ?? -1} onChange={(e) => setField(f, Number(e.target.value))}>
-                      <option value={-1}>— none —</option>
+                      <option value={-1}>(none)</option>
                       {uHeaders.map((h, idx) => (
                         <option key={idx} value={idx}>
                           {h}

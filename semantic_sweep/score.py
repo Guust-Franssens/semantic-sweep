@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from dataclasses import replace
+
 from semantic_sweep.lifecycle import classify_workspace, is_lifecycle_candidate
 from semantic_sweep.measures import MeasureMatch, match_model_measures, round4
-from semantic_sweep.parser import ModelCard
+from semantic_sweep.parser import ModelCard, model_id
 
 FACET_WEIGHTS = {"measure": 0.40, "schema": 0.20, "source_logical": 0.22, "source_physical": 0.08, "rel": 0.10}
 
@@ -167,6 +169,28 @@ def score_pair(a: ModelCard, b: ModelCard) -> PairResult:
         measure=measure,
         warnings=_warnings(a, b, physical_mismatch),
     )
+
+
+def dedupe_model_ids(cards: list[ModelCard]) -> list[ModelCard]:
+    """Guarantee model_id() uniqueness across one scan.
+
+    model_id() has no identity to fall back on beyond "workspace/name", so two cards can collide:
+    an ad-hoc TMDL-zip upload with a reused workspace label, or a live-scan workspace that was
+    deleted and recreated under the same display name. Left uncaught, anything keyed by model_id()
+    downstream (the report's dedupe-by-id logic, the UI's labels map) silently collapses the second
+    card into the first slot -- which is exactly what produces a duplicated-looking label like
+    "Sales, Sales" instead of two distinguishable rows. Disambiguate by suffixing the workspace of
+    the 2nd+ collider so every downstream model_id() stays unique, and the distinction stays
+    visible to the user.
+    """
+    seen: dict[str, int] = {}
+    out: list[ModelCard] = []
+    for card in cards:
+        key = model_id(card)
+        n = seen.get(key, 0) + 1
+        seen[key] = n
+        out.append(card if n == 1 else replace(card, workspace=f"{card.workspace} ({n})"))
+    return out
 
 
 def score_all(cards: list[ModelCard]) -> list[PairResult]:

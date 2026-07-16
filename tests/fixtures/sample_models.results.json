@@ -67,11 +67,11 @@
     {
       "a": "Sales Team B/Commercial Sales (rounded)",
       "b": "Sales Team C/Commercial Sales (truncated)",
-      "headline": 0.9829,
+      "headline": 0.9846,
       "band": "exact-clone",
       "lifecycle": false,
-      "measure": 0.9606,
-      "containment": 0.9606,
+      "measure": 0.9645,
+      "containment": 0.9645,
       "schema": 1.0,
       "source_logical": 1.0,
       "matched_measures": 5
@@ -79,11 +79,11 @@
     {
       "a": "Sales Team A/Commercial Sales",
       "b": "Sales Team B/Commercial Sales (rounded)",
-      "headline": 0.9539,
+      "headline": 0.9547,
       "band": "strong-duplicate",
       "lifecycle": false,
-      "measure": 0.8939,
-      "containment": 0.9219,
+      "measure": 0.8957,
+      "containment": 0.9232,
       "schema": 1.0,
       "source_logical": 1.0,
       "matched_measures": 5
@@ -91,11 +91,11 @@
     {
       "a": "Sales Team A/Commercial Sales",
       "b": "Sales Team C/Commercial Sales (truncated)",
-      "headline": 0.9539,
+      "headline": 0.9547,
       "band": "strong-duplicate",
       "lifecycle": false,
-      "measure": 0.8939,
-      "containment": 0.9219,
+      "measure": 0.8957,
+      "containment": 0.9232,
       "schema": 1.0,
       "source_logical": 1.0,
       "matched_measures": 5
@@ -103,11 +103,11 @@
     {
       "a": "Finance Team/Sales Margin",
       "b": "Sales Team A/Commercial Sales",
-      "headline": 0.5906,
+      "headline": 0.5727,
       "band": "needs-review",
       "lifecycle": false,
-      "measure": 0.5404,
-      "containment": 0.7059,
+      "measure": 0.4991,
+      "containment": 0.664,
       "schema": 0.6528,
       "source_logical": 0.6667,
       "matched_measures": 3
@@ -115,11 +115,11 @@
     {
       "a": "Finance Team/Sales Margin",
       "b": "Sales Team B/Commercial Sales (rounded)",
-      "headline": 0.4901,
-      "band": "needs-review",
+      "headline": 0.4768,
+      "band": "related-source",
       "lifecycle": false,
-      "measure": 0.3091,
-      "containment": 0.4163,
+      "measure": 0.2786,
+      "containment": 0.3819,
       "schema": 0.6528,
       "source_logical": 0.6667,
       "matched_measures": 2
@@ -127,11 +127,11 @@
     {
       "a": "Finance Team/Sales Margin",
       "b": "Sales Team C/Commercial Sales (truncated)",
-      "headline": 0.4901,
-      "band": "needs-review",
+      "headline": 0.4768,
+      "band": "related-source",
       "lifecycle": false,
-      "measure": 0.3091,
-      "containment": 0.4163,
+      "measure": 0.2786,
+      "containment": 0.3819,
       "schema": 0.6528,
       "source_logical": 0.6667,
       "matched_measures": 2
@@ -139,11 +139,11 @@
     {
       "a": "Exec Team/Revenue Report",
       "b": "Sales Team A/Commercial Sales",
-      "headline": 0.4075,
+      "headline": 0.3854,
       "band": "needs-review",
       "lifecycle": false,
-      "measure": 0.9015,
-      "containment": 0.9015,
+      "measure": 0.8508,
+      "containment": 0.9016,
       "schema": 0.0714,
       "source_logical": 0.0,
       "matched_measures": 5
@@ -151,11 +151,11 @@
     {
       "a": "Exec Team/Revenue Report",
       "b": "Sales Team B/Commercial Sales (rounded)",
-      "headline": 0.2473,
+      "headline": 0.2436,
       "band": "unrelated",
       "lifecycle": false,
-      "measure": 0.5332,
-      "containment": 0.5499,
+      "measure": 0.5246,
+      "containment": 0.5393,
       "schema": 0.0714,
       "source_logical": 0.0,
       "matched_measures": 3
@@ -163,11 +163,11 @@
     {
       "a": "Exec Team/Revenue Report",
       "b": "Sales Team C/Commercial Sales (truncated)",
-      "headline": 0.2473,
+      "headline": 0.2436,
       "band": "unrelated",
       "lifecycle": false,
-      "measure": 0.5332,
-      "containment": 0.5499,
+      "measure": 0.5246,
+      "containment": 0.5393,
       "schema": 0.0714,
       "source_logical": 0.0,
       "matched_measures": 3
@@ -175,11 +175,11 @@
     {
       "a": "Exec Team/Revenue Report",
       "b": "Finance Team/Sales Margin",
-      "headline": 0.2443,
+      "headline": 0.2223,
       "band": "unrelated",
       "lifecycle": false,
-      "measure": 0.5203,
-      "containment": 0.6796,
+      "measure": 0.4697,
+      "containment": 0.6621,
       "schema": 0.0833,
       "source_logical": 0.0,
       "matched_measures": 3

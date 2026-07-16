@@ -138,7 +138,7 @@ interface DefinitionPart {
 function cleanReason(raw: string): string {
   const low = raw.toLowerCase();
   if (low.includes("workload failed to export") || low.includes("direct lake") || low.includes("capacity")) {
-    return "capacity paused / Direct Lake — model not exportable";
+    return "capacity paused / Direct Lake, model not exportable";
   }
   if (low.includes("forbidden") || low.includes("401") || low.includes("403")) return "no access";
   if (low.includes("timed out")) return "timed out";
@@ -287,7 +287,7 @@ export async function probeAdminScan(provider: TokenProvider): Promise<AdminProb
     if (r.ok) return { available: true, status: r.status };
     const reason =
       r.status === 401 || r.status === 403
-        ? "Tenant-wide admin scan is unavailable — this app needs the Power BI Tenant.Read.All admin permission (an Entra admin must grant consent), or you must be a Fabric admin. Scanning the workspaces you can access instead."
+        ? "Tenant-wide admin scan is unavailable: this app needs the Power BI Tenant.Read.All admin permission (an Entra admin must grant consent), or you must be a Fabric admin. Scanning the workspaces you can access instead."
         : `Admin Scanner API returned ${r.status}. Scanning the workspaces you can access instead.`;
     return { available: false, status: r.status, reason };
   } catch {

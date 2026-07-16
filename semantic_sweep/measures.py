@@ -1,16 +1,19 @@
-"""Measure-level similarity: weighted lexical DAX features + greedy one-to-one matching.
+"""Measure-level similarity: weighted lexical DAX features + maximum bipartite matching.
 
 We deliberately avoid embeddings (a general text model collapses ``SUM`` vs ``AVERAGE``). Instead
 each measure becomes a small feature set (functions, referenced columns/measures, operators,
 context flags, a clone *skeleton*) and pairs are scored by a weighted blend with two guards:
 an **incompatible-aggregator penalty** (``SUM`` vs ``AVERAGE``) and **function-family partial
-credit** (``ROUND`` vs ``TRUNC``). Models are then matched greedily one-to-one.
+credit** (``ROUND`` vs ``TRUNC``). Models are then matched one-to-one via Kuhn's augmenting-path
+algorithm (see ``_max_weight_bipartite_match``), which finds a maximum-cardinality assignment
+instead of the smaller matching a naive greedy first-come-first-served pass can get stuck with.
 """
 
 from __future__ import annotations
 
 import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from semantic_sweep.parser import Measure
@@ -287,9 +290,19 @@ def measure_similarity(a: DaxFeatures, b: DaxFeatures) -> float:
 
 
 def _measure_weight(measure: Measure, feats: DaxFeatures) -> float:
-    """Informativeness weight: generic-named measures count less; complex ones count more."""
-    name = re.sub(r"[^a-z0-9]", "", measure.name.lower())
-    base = 0.4 if name in GENERIC_NAMES else 1.0
+    """Informativeness weight: generic-named measures count less; complex ones count more.
+
+    Tokenize on word boundaries (not a single concatenated blob) so a multi-word name like "Total
+    Sales" is judged word-by-word against GENERIC_NAMES instead of vanishing into "totalsales",
+    which matches nothing and was silently never downweighted. Square the generic-word fraction
+    before applying the discount: a name that is ALL generic words (e.g. "Total", or "Total Count")
+    still gets the full 0.4 floor exactly as before, but a name that is only PARTLY generic (e.g.
+    "Total Sales") is discounted much more gently, since one specific word ("Sales") already carries
+    most of the discriminating signal -- informativeness doesn't fall off linearly with word count.
+    """
+    words = [w for w in re.split(r"[^a-z0-9]+", measure.name.lower()) if w]
+    generic_frac = (sum(1 for w in words if w in GENERIC_NAMES) / len(words)) if words else 0.0
+    base = 1.0 - 0.6 * generic_frac * generic_frac
     complexity = 1.0 + 0.1 * min(len(feats.functions) + len(feats.refs), 6)
     return base * complexity
 
@@ -306,15 +319,64 @@ class MeasureMatch:
     strong_matched: int = 0
 
 
+def _max_weight_bipartite_match(
+    score_of: Callable[[int, int], float], size_a: int, size_b: int, threshold: float
+) -> list[tuple[float, int, int]]:
+    """Maximum-cardinality bipartite matching via Kuhn's augmenting-path algorithm.
+
+    A plain greedy "sort candidates by score, take first-come-first-served" pass under-counts
+    matches: whichever side of a contested pair loses out is left unmatched even when a different,
+    equally-valid assignment would have matched EVERY measure that has a candidate. Example:
+    A0~B0=0.90, A0~B1=0.85, A1~B0=0.88 (A1~B1 below threshold). Greedy takes A0-B0 first (highest
+    score) and then discards both A1~B0 (B0 taken) and A0~B1 (A0 taken), leaving A1 unmatched --
+    even though A0-B1 + A1-B0 matches both sides. Kuhn's algorithm finds that second assignment by
+    letting a contested node "steal" its match and pushing the displaced node to search for an
+    alternative (an augmenting path), which is guaranteed to find a maximum matching regardless of
+    processing order. Node order (by each node's best candidate score, descending) and per-node
+    edge order (by score, descending) are both deterministic tie-breakers that bias the search
+    toward higher-weight matchings among the (possibly several) maximum ones.
+    """
+    adj: list[list[tuple[float, int]]] = []  # adj[i] = [(score, j), ...] desc by score, then j
+    for i in range(size_a):
+        row = [(score_of(i, j), j) for j in range(size_b) if score_of(i, j) >= threshold]
+        row.sort(key=lambda t: (-t[0], t[1]))
+        adj.append(row)
+
+    match_b: dict[int, int] = {}  # j -> i
+    match_a: dict[int, int] = {}  # i -> j
+    match_score: dict[int, float] = {}  # i -> score of its current match
+
+    def try_augment(i: int, visited_b: set[int]) -> bool:
+        for score, j in adj[i]:
+            if j in visited_b:
+                continue
+            visited_b.add(j)
+            occupant = match_b.get(j)
+            if occupant is None or try_augment(occupant, visited_b):
+                match_b[j] = i
+                match_a[i] = j
+                match_score[i] = score
+                return True
+        return False
+
+    order = sorted((i for i in range(size_a) if adj[i]), key=lambda i: (-adj[i][0][0], i))
+    for i in order:
+        try_augment(i, set())
+
+    result = [(match_score[i], i, j) for i, j in match_a.items()]
+    result.sort(key=lambda t: (-t[0], t[1], t[2]))  # highest-confidence matches first
+    return result
+
+
 def match_model_measures(
     measures_a: list[Measure], measures_b: list[Measure], *, threshold: float = 0.8
 ) -> MeasureMatch:
-    """Greedy one-to-one match between two measure sets; return similarity + containment.
+    """Maximum one-to-one match between two measure sets; return similarity + containment.
 
     ``similarity = matched_weight / max(total)`` (penalizes size gaps), while
     ``containment = matched_weight / min(total)`` flags a subset/trimmed copy.
     """
-    # pylint: disable=too-many-locals  # cohesive greedy-matching algorithm
+    # pylint: disable=too-many-locals  # cohesive matching algorithm
     # Drop measures whose DAX is unavailable (empty) so they neither match each other nor dilute the
     # weights -- otherwise a tenant that withholds expressions scores every model pair as a clone (acc1).
     real_a = [m for m in measures_a if (m.dax or "").strip()]
@@ -324,24 +386,14 @@ def match_model_measures(
     weights_a = [_measure_weight(m, f) for m, f in zip(real_a, feats_a)]
     weights_b = [_measure_weight(m, f) for m, f in zip(real_b, feats_b)]
 
-    candidates = []
-    for i, fa in enumerate(feats_a):
-        for j, fb in enumerate(feats_b):
-            score = measure_similarity(fa, fb)
-            if score >= threshold:
-                candidates.append((score, i, j))
-    candidates.sort(reverse=True)
+    assignment = _max_weight_bipartite_match(
+        lambda i, j: measure_similarity(feats_a[i], feats_b[j]), len(feats_a), len(feats_b), threshold
+    )
 
-    used_a: set[int] = set()
-    used_b: set[int] = set()
     matched: list[tuple[str, str, float]] = []
     matched_weight = 0.0
     strong_matched = 0
-    for score, i, j in candidates:
-        if i in used_a or j in used_b:
-            continue
-        used_a.add(i)
-        used_b.add(j)
+    for score, i, j in assignment:
         matched.append((real_a[i].name, real_b[j].name, score))
         matched_weight += min(weights_a[i], weights_b[j]) * score
         # Ref-backed = identical DAX, an exact qualified column match, or a shared SPECIFIC bare name.

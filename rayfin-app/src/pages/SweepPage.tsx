@@ -110,13 +110,13 @@ function modeFromLabel(label: string): string {
 // their own workspaces, sample data, or an imported file.
 function scanScope(source: string): { label: string; Icon: LucideIcon; tone: "admin" | "user" | "neutral"; title: string } {
   if (/admin scan/i.test(source)) {
-    return { label: "Tenant-wide admin scan", Icon: Shield, tone: "admin", title: "Scanned every model across the tenant via the Admin Scanner API — includes models on paused capacities." };
+    return { label: "Tenant-wide admin scan", Icon: Shield, tone: "admin", title: "Scanned every model across the tenant via the Admin Scanner API, includes models on paused capacities." };
   }
   if (/^fabric/i.test(source)) {
     return { label: "Per-user scan", Icon: Users, tone: "user", title: "Scanned the workspaces you can access. Models on paused capacities may be skipped. A tenant-wide admin scan (Power BI Tenant.Read.All, Entra admin consent) reads every model regardless of capacity." };
   }
   if (/demo|sample|usage demo/i.test(source)) {
-    return { label: "Sample data", Icon: Boxes, tone: "neutral", title: "Embedded demo estate — not your Fabric tenant." };
+    return { label: "Sample data", Icon: Boxes, tone: "neutral", title: "Embedded demo estate, not your Fabric tenant." };
   }
   return { label: "Imported file", Icon: Boxes, tone: "neutral", title: "Scored from an uploaded TMDL/zip export." };
 }
@@ -177,7 +177,7 @@ function SavedScansPanel({
         {saving && <span className="text-[12px] text-muted-foreground">saving…</span>}
       </div>
       <p className="mb-[10px] text-[13px] text-muted-foreground">
-        Scans are saved to your own Fabric workspace and restored automatically when you return — pick an earlier one below.
+        Scans are saved to your own Fabric workspace and restored automatically when you return; pick an earlier one below.
       </p>
       <div className="space-y-[8px]">
         {scans.map((s) => {
@@ -240,7 +240,7 @@ function CompositeSection({ links, onModel }: { links: CompositeLink[]; onModel:
     <>
       <h2 className="mb-[8px] text-[15px] font-bold text-foreground">Composite &amp; derived models</h2>
       <p className="mb-[10px] text-[13px] text-muted-foreground">
-        Models built on another dataset via <b>DirectQuery</b> — an explicit, intentional link (reuse of a shared/golden dataset), not a coincidental duplicate.
+        Models built on another dataset via <b>DirectQuery</b>: an explicit, intentional link (reuse of a shared/golden dataset), not a coincidental duplicate.
       </p>
       <div className="space-y-[8px]">
         {links.map((l, i) => (
@@ -275,14 +275,14 @@ function SkippedBanner({ skipped }: { skipped: ExportFailure[] }) {
   return (
     <div className="mb-[16px] rounded-xl border border-[#d9a441] bg-[#d9a4411f] px-[16px] py-[12px]">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-[8px] text-left text-[13px] font-bold text-[#b47500]">
-        <span>⚠︎ {skipped.length} model{skipped.length > 1 ? "s" : ""} skipped — not scored</span>
+        <span>⚠︎ {skipped.length} model{skipped.length > 1 ? "s" : ""} skipped, not scored</span>
         <span className="ml-auto text-[12px] font-semibold">{open ? "hide" : "show details"}</span>
       </button>
       {open && (
         <div className="mt-[10px] space-y-[8px] text-[12px]">
           {[...byReason.entries()].map(([reason, items]) => (
             <div key={reason}>
-              <div className="font-semibold text-[#b47500]">{reason} — {items.length}</div>
+              <div className="font-semibold text-[#b47500]">{reason} ({items.length})</div>
               <div className="mt-[1px] text-muted-foreground">
                 {items.slice(0, 10).map((i) => `${i.model} · ${i.workspace}`).join(", ")}
                 {items.length > 10 ? ` +${items.length - 10} more` : ""}
@@ -290,7 +290,7 @@ function SkippedBanner({ skipped }: { skipped: ExportFailure[] }) {
             </div>
           ))}
           <div className="text-muted-foreground">
-            Most skips are <b>paused capacities</b> — resume the capacity (Fabric/Azure portal) to include them. A
+            Most skips are <b>paused capacities</b>, resume the capacity (Fabric/Azure portal) to include them. A
             {" "}<b>tenant-wide admin scan</b> reads every model regardless of capacity, but needs this app granted the
             {" "}Power BI <b>Tenant.Read.All</b> permission (an Entra admin must consent).
           </div>
@@ -663,7 +663,7 @@ export function SweepPage() {
               <button
                 onClick={() => void rescan()}
                 disabled={rescanning}
-                title="Re-scan your live Fabric estate now — replaces the current view with a fresh scan and saves it."
+                title="Re-scan your live Fabric estate now, replaces the current view with a fresh scan and saves it."
                 className="flex items-center gap-[6px] rounded-lg border border-border bg-card px-[11px] py-[7px] text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
               >
                 <RefreshCw size={14} className={rescanning ? "animate-spin" : ""} /> {rescanning ? "Re-scanning…" : "Re-scan"}
@@ -700,7 +700,7 @@ export function SweepPage() {
             >
               {view === "overview" && (
                 <>
-                  <ViewHeader title="Estate overview" subtitle="Near-duplicate semantic models across your estate — decision support, not auto-deletion." />
+                  <ViewHeader title="Estate overview" subtitle="Near-duplicate semantic models across your estate: decision support, not auto-deletion." />
                   <SkippedBanner skipped={skipped} />
                   {usageOn ? <UsageSummary recs={scan.recommendations!} /> : <Insights clusters={displayClusters} chains={scan.chains} composite={scan.compositeLinks?.length ?? 0} />}
                   <div className="mt-[16px]">{statCards}</div>
@@ -717,7 +717,7 @@ export function SweepPage() {
 
               {view === "consolidation" && (
                 <>
-                  <ViewHeader title="Consolidation worklist" subtitle="Cross-team models computing the same thing. With usage fused, each becomes a ranked, evidence-backed call — a human confirms." />
+                  <ViewHeader title="Consolidation worklist" subtitle="Cross-team models computing the same thing. With usage fused, each becomes a ranked, evidence-backed call: a human confirms." />
                   {usageOn && scan.recommendations && (
                     <div className="mb-[24px]">
                       <Worklist recs={scan.recommendations} onModel={setModel} />
@@ -727,7 +727,7 @@ export function SweepPage() {
                   {lifecycleDupCount > 0 && (
                     <div className="mb-[10px] flex flex-wrap items-center gap-x-[10px] gap-y-[6px] rounded-lg border border-border bg-card px-[12px] py-[8px] text-[12px] text-muted-foreground">
                       <span>
-                        <b className="text-foreground">{lifecycleDupCount}</b> duplicate pair{lifecycleDupCount === 1 ? "" : "s"} {lifecycleDupCount === 1 ? "is" : "are"} the same model across dev/test/prod — shown as{" "}
+                        <b className="text-foreground">{lifecycleDupCount}</b> duplicate pair{lifecycleDupCount === 1 ? "" : "s"} {lifecycleDupCount === 1 ? "is" : "are"} the same model across dev/test/prod, shown as{" "}
                         <button className="font-semibold text-primary hover:underline" onClick={() => setView("review")}>promotion chains</button>, not consolidation targets.
                       </span>
                       <label className="ml-auto flex cursor-pointer items-center gap-[6px] font-semibold text-foreground">
@@ -759,7 +759,7 @@ export function SweepPage() {
                   <Toolbar bands={REVIEW_BANDS} active={activeBands} onToggle={toggleBand} search={search} onSearch={setSearch} />
                   <ReviewTable pairs={reviewPairs} labels={labels} onWhy={setWhy} />
                   <h2 className="mb-[8px] mt-[26px] text-[15px] font-bold text-foreground">Promotion chains (dev / test / prod)</h2>
-                  <p className="mb-[10px] text-[13px] text-muted-foreground">Same model promoted across environments — expected, not a consolidation target. Drift = numbers may differ across stages.</p>
+                  <p className="mb-[10px] text-[13px] text-muted-foreground">Same model promoted across environments: expected, not a consolidation target. Drift = numbers may differ across stages.</p>
                   <Chains chains={scan.chains} labels={labels} />
                   <h2 className="mb-[8px] mt-[26px] text-[15px] font-bold text-foreground">Excluded buckets</h2>
                   <Buckets systemGenerated={systemGenerated} emptyModels={scan.emptyModels} excludedDupes={excludedSystemDupes} labels={labels} onWhy={setWhy} />
@@ -768,7 +768,7 @@ export function SweepPage() {
 
               {view === "connect" && (
                 <>
-                  <ViewHeader title="Connect data" subtitle="Sign in to scan your Fabric estate, load a usage/metadata table, or open exported TMDL — everything is scored in your browser." />
+                  <ViewHeader title="Connect data" subtitle="Sign in to scan your Fabric estate, load a usage/metadata table, or open exported TMDL: everything is scored in your browser." />
                   <SourcePanel
                     onData={loadFiles}
                     onSample={() => void loadFiles(sampleFiles, "embedded demo control set", false)}

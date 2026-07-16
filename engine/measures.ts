@@ -192,10 +192,77 @@ export function measureSimilarity(a: DaxFeatures, b: DaxFeatures): number {
 }
 
 function measureWeight(m: Measure, f: DaxFeatures): number {
-  const name = m.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const base = GENERIC_NAMES.has(name) ? 0.4 : 1;
+  // Tokenize on word boundaries (not a single concatenated blob) so a multi-word name like "Total
+  // Sales" is judged word-by-word against GENERIC_NAMES instead of vanishing into "totalsales",
+  // which matches nothing and was silently never downweighted. Square the generic-word fraction
+  // before applying the discount: a name that is ALL generic words (e.g. "Total", or "Total Count")
+  // still gets the full 0.4 floor exactly as before, but a name that is only PARTLY generic (e.g.
+  // "Total Sales") is discounted much more gently, since one specific word ("Sales") already carries
+  // most of the discriminating signal -- informativeness doesn't fall off linearly with word count.
+  const words = m.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const genericFrac = words.length ? words.filter((w) => GENERIC_NAMES.has(w)).length / words.length : 0;
+  const base = 1 - 0.6 * genericFrac * genericFrac;
   const complexity = 1 + 0.1 * Math.min(f.functions.size + f.refs.size, 6);
   return base * complexity;
+}
+
+// Maximum-cardinality bipartite matching via Kuhn's augmenting-path algorithm, restricted to edges
+// scoring >= threshold. A plain greedy "sort candidates by score, take first-come-first-served"
+// pass under-counts matches: whichever side of a contested pair loses out is left unmatched even
+// when a different, equally-valid assignment would have matched EVERY measure that has a
+// candidate. Example: A0~B0=0.90, A0~B1=0.85, A1~B0=0.88 (A1~B1 below threshold). Greedy takes
+// A0-B0 first (highest score) and then discards both A1~B0 (B0 taken) and A0~B1 (A0 taken),
+// leaving A1 unmatched -- even though A0-B1 + A1-B0 matches both sides. Kuhn's algorithm finds
+// that second assignment by letting a contested node "steal" its match and pushing the displaced
+// node to search for an alternative (an augmenting path), which is guaranteed to find a maximum
+// matching regardless of processing order. Node order (by each node's best candidate score,
+// descending) and per-node edge order (by score, descending) are both deterministic tie-breakers
+// that bias the search toward higher-weight matchings among the (possibly several) maximum ones.
+function maxWeightBipartiteMatch(
+  scoreOf: (i: number, j: number) => number,
+  sizeA: number,
+  sizeB: number,
+  threshold: number,
+): Array<[number, number, number]> {
+  const adj: Array<Array<[number, number]>> = []; // adj[i] = [[score, j], ...] desc by score, then j
+  for (let i = 0; i < sizeA; i++) {
+    const row: Array<[number, number]> = [];
+    for (let j = 0; j < sizeB; j++) {
+      const score = scoreOf(i, j);
+      if (score >= threshold) row.push([score, j]);
+    }
+    row.sort((x, y) => y[0] - x[0] || x[1] - y[1]);
+    adj.push(row);
+  }
+
+  const matchB = new Map<number, number>(); // j -> i
+  const matchA = new Map<number, number>(); // i -> j
+  const matchScore = new Map<number, number>(); // i -> score of its current match
+
+  function tryAugment(i: number, visitedB: Set<number>): boolean {
+    for (const [score, j] of adj[i]) {
+      if (visitedB.has(j)) continue;
+      visitedB.add(j);
+      const occupant = matchB.get(j);
+      if (occupant === undefined || tryAugment(occupant, visitedB)) {
+        matchB.set(j, i);
+        matchA.set(i, j);
+        matchScore.set(i, score);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const order = Array.from({ length: sizeA }, (_, i) => i)
+    .filter((i) => adj[i].length > 0)
+    .sort((x, y) => adj[y][0][0] - adj[x][0][0] || x - y);
+  for (const i of order) tryAugment(i, new Set());
+
+  const result: Array<[number, number, number]> = [];
+  for (const [i, j] of matchA) result.push([matchScore.get(i)!, i, j]);
+  result.sort((x, y) => y[0] - x[0] || x[1] - y[1] || x[2] - y[2]); // highest-confidence matches first
+  return result;
 }
 
 export function matchModelMeasures(
@@ -212,25 +279,17 @@ export function matchModelMeasures(
   const weightsA = realA.map((m, i) => measureWeight(m, featsA[i]));
   const weightsB = realB.map((m, i) => measureWeight(m, featsB[i]));
 
-  const candidates: Array<[number, number, number]> = [];
-  for (let i = 0; i < featsA.length; i++) {
-    for (let j = 0; j < featsB.length; j++) {
-      const score = measureSimilarity(featsA[i], featsB[j]);
-      if (score >= threshold) candidates.push([score, i, j]);
-    }
-  }
-  // Mirror Python's sort of (score, i, j) tuples in reverse (desc on each).
-  candidates.sort((x, y) => y[0] - x[0] || y[1] - x[1] || y[2] - x[2]);
+  const assignment = maxWeightBipartiteMatch(
+    (i, j) => measureSimilarity(featsA[i], featsB[j]),
+    featsA.length,
+    featsB.length,
+    threshold,
+  );
 
-  const usedA = new Set<number>();
-  const usedB = new Set<number>();
   const matched: Array<{ a: string; b: string; score: number }> = [];
   let matchedWeight = 0;
   let strongMatched = 0;
-  for (const [score, i, j] of candidates) {
-    if (usedA.has(i) || usedB.has(j)) continue;
-    usedA.add(i);
-    usedB.add(j);
+  for (const [score, i, j] of assignment) {
     matched.push({ a: realA[i].name, b: realB[j].name, score });
     matchedWeight += Math.min(weightsA[i], weightsB[j]) * score;
     // Ref-backed = identical DAX, an exact qualified column match, or a shared SPECIFIC bare name. A

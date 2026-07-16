@@ -41,7 +41,7 @@ export function UsageSummary({ recs }: { recs: Recommendation[] }) {
         safe <strong>retirement candidate{retire === 1 ? "" : "s"}</strong> (duplicate + unused + evidence)
         {savingHrs > 0 && (
           <>
-            {" "}— reclaiming ~<strong>{savingHrs.toLocaleString()} refresh-hrs/yr*</strong>
+            {", "}reclaiming ~<strong>{savingHrs.toLocaleString()} refresh-hrs/yr*</strong>
           </>
         )}
         . Plus <strong>{merge}</strong> to merge, <strong>{conflicts}</strong> conflict{conflicts === 1 ? "" : "s"} to
@@ -55,7 +55,7 @@ export function Worklist({ recs, onModel }: { recs: Recommendation[]; onModel: (
   const [status, setStatus] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   if (recs.length === 0) {
-    return <p className="empty">No recommendations yet — load a usage / metadata table to fuse usage with similarity.</p>;
+    return <p className="empty">No recommendations yet: load a usage / metadata table to fuse usage with similarity.</p>;
   }
   const query = q.trim().toLowerCase();
   const shown = query
@@ -145,7 +145,7 @@ export function Worklist({ recs, onModel }: { recs: Recommendation[]; onModel: (
       <p className="cov-note">
         Drift checked: measures (same-name), relationships, column data types, RLS/calc-group presence. Not yet checked
         (roadmap): RLS rule text, partition/M. Join: <strong>GUID</strong> = decision-grade,{" "}
-        <strong>workspace+name</strong> = confirm identity. Decision support — never auto-deletes.
+        <strong>workspace+name</strong> = confirm identity. Decision support: never auto-deletes.
       </p>
     </>
   );
@@ -300,10 +300,10 @@ export function Buckets({ systemGenerated, emptyModels, excludedDupes, labels, o
     <>
       {excludedDupes.length > 0 && (
         <details open>
-          <summary>Detected duplicates held back ({excludedDupes.length}) — system-generated, excluded from the worklist</summary>
+          <summary>Detected duplicates held back ({excludedDupes.length}): system-generated, excluded from the worklist</summary>
           <p className="muted" style={{ margin: "6px 0 8px" }}>
             These pairs score as duplicates but at least one side is an auto-generated model (Usage Metrics, default
-            dataset). They are surfaced for transparency, not consolidation — retiring a system model breaks the feature
+            dataset). They are surfaced for transparency, not consolidation: retiring a system model breaks the feature
             that owns it.
           </p>
           <table className="grid">
@@ -331,7 +331,7 @@ export function Buckets({ systemGenerated, emptyModels, excludedDupes, labels, o
         </details>
       )}
       <details>
-        <summary>System-generated models ({systemGenerated.length}) — excluded</summary>
+        <summary>System-generated models ({systemGenerated.length}), excluded</summary>
         <ul className="plain">
           {systemGenerated.length ? systemGenerated.map((c) => <li key={modelId(c)}>{labels.get(modelId(c))}</li>) : <li>None</li>}
         </ul>
@@ -342,7 +342,7 @@ export function Buckets({ systemGenerated, emptyModels, excludedDupes, labels, o
           {emptyModels.length ? (
             emptyModels.map((c) => (
               <li key={modelId(c)}>
-                {c.name} <span className="muted">({c.workspace}) — default/empty model (0 tables)</span>
+                {c.name} <span className="muted">({c.workspace}), default/empty model (0 tables)</span>
               </li>
             ))
           ) : (
@@ -388,7 +388,7 @@ export function Insights({ clusters, chains, composite = 0 }: { clusters: Cluste
           <>
             {" "}
             <strong>{composite}</strong> composite/derived model{composite === 1 ? "" : "s"} reuse{composite === 1 ? "s" : ""} a shared dataset via
-            DirectQuery — intentional lineage, not a duplicate.
+            DirectQuery: intentional lineage, not a duplicate.
           </>
         )}
       </div>
@@ -457,9 +457,9 @@ export function ModelDrawer({ card, pairs, labels, onClose, onOpenPair }: ModelD
           <dt>Measures</dt>
           <dd>{card.measures.length}</dd>
           <dt>Source (logical)</dt>
-          <dd>{card.sourceLogical.size || "—"}</dd>
+          <dd>{card.sourceLogical.size || "N/A"}</dd>
           <dt>Source (physical)</dt>
-          <dd>{card.sourcePhysical.size || "—"}</dd>
+          <dd>{card.sourcePhysical.size || "N/A"}</dd>
           <dt>RLS</dt>
           <dd>{card.hasRls ? "yes" : "no"}</dd>
           <dt>Calc groups</dt>
@@ -556,7 +556,7 @@ export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
 
         <div className="mm">
           <div className="tag">
-            Matched measures ({pair.measure.matched.length}) — containment {pair.measure.containment.toFixed(2)}
+            Matched measures ({pair.measure.matched.length}), containment {pair.measure.containment.toFixed(2)}
           </div>
           {pair.measure.matched.length === 0 && <div className="muted">No measures matched above threshold.</div>}
           {pair.measure.matched.map((m, i) => (
@@ -580,8 +580,8 @@ export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
                   <span className="tag">({m.score.toFixed(2)})</span>
                 </div>
                 <div className="daxdiff">
-                  <pre>{daxA.get(m.a) ?? "—"}</pre>
-                  <pre>{daxB.get(m.b) ?? "—"}</pre>
+                  <pre>{daxA.get(m.a) ?? "N/A"}</pre>
+                  <pre>{daxB.get(m.b) ?? "N/A"}</pre>
                 </div>
               </div>
             ))}

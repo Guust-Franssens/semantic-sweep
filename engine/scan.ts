@@ -61,9 +61,27 @@ function computeCompositeLinks(cards: ModelCard[]): CompositeLink[] {
   return links;
 }
 
+// modelId() has no identity to fall back on beyond "workspace/name", so two cards can collide: an
+// ad-hoc TMDL-zip upload with a reused workspace label, or a live-scan workspace that was deleted
+// and recreated under the same display name. Left uncaught, every Map/Set keyed by modelId() (the
+// pair/cluster/chain builders below, and the UI's labels map) silently collapses the second card
+// into the first slot — which is exactly what produces a duplicated-looking label like "Sales,
+// Sales" instead of two distinguishable rows. Disambiguate by suffixing the workspace of the 2nd+
+// collider so every downstream modelId() stays unique, and the distinction stays visible to the user.
+function dedupeModelIds(cards: ModelCard[]): ModelCard[] {
+  const seen = new Map<string, number>();
+  return cards.map((c) => {
+    const key = modelId(c);
+    const n = (seen.get(key) ?? 0) + 1;
+    seen.set(key, n);
+    return n === 1 ? c : { ...c, workspace: `${c.workspace} (${n})` };
+  });
+}
+
 // Score + cluster + chain a set of ModelCards (post-parse pipeline; shared by the TMDL and
 // Scanner-API paths).
-export function scanCards(cards: ModelCard[]): ScanResult {
+export function scanCards(cardsIn: ModelCard[]): ScanResult {
+  const cards = dedupeModelIds(cardsIn);
   const pairs = scoreAll(cards);
   return {
     cards,

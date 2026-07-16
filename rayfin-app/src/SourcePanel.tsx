@@ -118,7 +118,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
     try {
       await getFabricToken({ interactive: true, loginHint: fabricUserEmail }); // ensure a fresh session (silent if cached)
     } catch (e) {
-      return toast(`Session expired — sign in again: ${String(e)}`, "err");
+      return toast(`Session expired, sign in again: ${String(e)}`, "err");
     }
     await runExport(chosen);
   }
@@ -139,7 +139,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
       setProgress({ done: 0, total: 0, label: "Scoring models…" });
       const scan = await scanScannerAsync(body);
       if (scan.cards.length === 0) {
-        toast("Admin scan returned no models — are you a Fabric/Power BI admin?", "err");
+        toast("Admin scan returned no models: are you a Fabric/Power BI admin?", "err");
       } else {
         onScan(scan, `Fabric tenant · admin scan · ${scan.cards.length} models`);
         toast(`Scanned ${scan.cards.length} models tenant-wide.`, "ok");
@@ -199,7 +199,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
 
   function applyMapped(): void {
     const records = buildUsageRecords(uRows, uMapping);
-    if (records.length === 0) return toast("No rows have a dataset name — map the 'Dataset / model name' column.", "err");
+    if (records.length === 0) return toast("No rows have a dataset name: map the 'Dataset / model name' column.", "err");
     onApplyUsage(records);
   }
 
@@ -222,7 +222,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
 
       {tab === "sample" && (
         <div className="tab-body">
-          <div className="hint">Load the built-in demo estate — labeled near-duplicates plus a composite/DirectQuery lineage example (nothing leaves your machine).</div>
+          <div className="hint">Load the built-in demo estate: labeled near-duplicates plus a composite/DirectQuery lineage example (nothing leaves your machine).</div>
           <button className="btn primary" onClick={onSample}>Load sample estate</button>
         </div>
       )}
@@ -262,7 +262,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
                   <label className="map-row" key={f}>
                     <span className="map-label">{FIELD_LABELS[f]}</span>
                     <select value={uMapping[f] ?? -1} onChange={(e) => setField(f, Number(e.target.value))}>
-                      <option value={-1}>— none —</option>
+                      <option value={-1}>(none)</option>
                       {uHeaders.map((h, idx) => (
                         <option key={idx} value={idx}>
                           {h}
@@ -283,7 +283,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
       {tab === "fabric" && (
         <div className="tab-body">
           <div className="hint">
-            Scan the workspaces <strong>you</strong> can access — sign in with your Fabric identity and the token is
+            Scan the workspaces <strong>you</strong> can access, sign in with your Fabric identity and the token is
             acquired silently (no paste). Models are exported and scored <strong>in your browser</strong>.
           </div>
 
@@ -348,7 +348,7 @@ export function SourcePanel({ onData, onSample, onLoadUsageDemo, onApplyUsage, o
       {tab === "folder" && (
         <div className="tab-body">
           <div className="hint">
-            Point at an exported <code>models</code> folder, or a <code>.zip</code> of it — parsed and scored entirely
+            Point at an exported <code>models</code> folder, or a <code>.zip</code> of it: parsed and scored entirely
             in your browser. Export with <code>fab export "&lt;ws&gt;.Workspace/&lt;model&gt;.SemanticModel" -o models</code>.
           </div>
           <div className="row">

@@ -13,7 +13,7 @@ from pathlib import Path
 from semantic_sweep.lifecycle import find_promotion_chains
 from semantic_sweep.parser import load_models
 from semantic_sweep.report import write_outputs
-from semantic_sweep.score import organic_clusters, score_all
+from semantic_sweep.score import dedupe_model_ids, organic_clusters, score_all
 
 
 def _clean_reason(raw: str) -> str:
@@ -63,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     if not cards:
         print(f"No semantic models found under {args.models}")
         return 1
+    cards = dedupe_model_ids(cards)
 
     pairs = score_all(cards)
     unscored = _unscored(args.models, args.export_results)
