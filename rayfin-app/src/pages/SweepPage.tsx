@@ -48,10 +48,12 @@ import { useAuth } from "@/hooks/AuthContext";
 import { Avatar, Card, cn, StatCard } from "../ui";
 import {
   deleteScan,
+  listDecisions,
   listScans,
   loadLatest,
   loadScan as loadSavedScan,
   saveScan,
+  setDecision,
   type SaveScanMeta,
   type ScanSummary,
 } from "../data/scanStore";
@@ -324,6 +326,9 @@ export function SweepPage() {
   const [activeScanId, setActiveScanId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [rescanning, setRescanning] = useState(false);
+  // Persisted human-in-the-loop consolidation decisions ({ memberModelId -> status }). Kept in memory
+  // always (survives tab switches even in local preview); written through to the DB when persistEnabled.
+  const [decisions, setDecisions] = useState<Record<string, string>>({});
   const restoreTried = useRef(false);
 
   function toast(msg: string, kind: string = "info"): void {
@@ -353,6 +358,8 @@ export function SweepPage() {
         }
         const list = await listScans(userId).catch(() => []);
         if (!cancelled) setSavedScans(list);
+        const savedDecisions = await listDecisions(userId).catch(() => ({}));
+        if (!cancelled) setDecisions(savedDecisions);
       } catch {
         /* restore is best-effort — fall through to the connect gate */
       } finally {
@@ -379,6 +386,21 @@ export function SweepPage() {
       toast(`Couldn't save scan: ${String(e).replace(/^Error:\s*/, "").slice(0, 120)}`, "err");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Record a consolidation decision: update the in-memory map immediately (optimistic) so the UI is
+  // snappy and works even without a backend, then write it through to the DB when persistence is
+  // available. A save failure is surfaced via a toast but never blocks the interaction.
+  function onDecision(memberId: string, keeperId: string, status: string): void {
+    setDecisions((d) => {
+      const next = { ...d };
+      if (status === "Proposed") delete next[memberId];
+      else next[memberId] = status;
+      return next;
+    });
+    if (persistEnabled && userId) {
+      void setDecision(userId, memberId, keeperId, status).catch(() => toast("Couldn't save that decision.", "err"));
     }
   }
 
@@ -732,7 +754,7 @@ export function SweepPage() {
                   <ViewHeader title="Consolidation worklist" subtitle="Cross-team models computing the same thing. With usage fused, each becomes a ranked, evidence-backed call: a human confirms." />
                   {usageOn && scan.recommendations && (
                     <div className="mb-[24px]">
-                      <Worklist recs={scan.recommendations} onModel={setModel} />
+                      <Worklist recs={scan.recommendations} onModel={setModel} decisions={decisions} onDecision={onDecision} />
                     </div>
                   )}
                   <h2 className="mb-[8px] text-[15px] font-bold text-foreground">Duplicate clusters</h2>

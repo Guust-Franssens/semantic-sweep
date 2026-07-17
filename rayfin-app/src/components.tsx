@@ -65,8 +65,25 @@ export function UsageSummary({ recs }: { recs: Recommendation[] }) {
   );
 }
 
-export function Worklist({ recs, onModel }: { recs: Recommendation[]; onModel: (c: ModelCard) => void }) {
-  const [status, setStatus] = useState<Record<string, string>>({});
+export function Worklist({
+  recs,
+  onModel,
+  decisions,
+  onDecision,
+}: {
+  recs: Recommendation[];
+  onModel: (c: ModelCard) => void;
+  // Controlled + persisted when supplied (deployed backend); falls back to local ephemeral state
+  // otherwise (local preview / no backend), so the dropdown always works.
+  decisions?: Record<string, string>;
+  onDecision?: (memberId: string, keeperId: string, status: string) => void;
+}) {
+  const [localStatus, setLocalStatus] = useState<Record<string, string>>({});
+  const status = decisions ?? localStatus;
+  const setStatusAt = (memberId: string, keeperId: string, val: string): void => {
+    if (onDecision) onDecision(memberId, keeperId, val);
+    else setLocalStatus((s) => ({ ...s, [memberId]: val }));
+  };
   const [q, setQ] = useState("");
   if (recs.length === 0) {
     return <p className="empty">No recommendations yet: load a usage / metadata table to fuse usage with similarity.</p>;
@@ -125,7 +142,7 @@ export function Worklist({ recs, onModel }: { recs: Recommendation[]; onModel: (
                 <select
                   className="rec-status"
                   value={status[id] ?? "Proposed"}
-                  onChange={(e) => setStatus((s) => ({ ...s, [id]: e.target.value }))}
+                  onChange={(e) => setStatusAt(id, r.keeper ? modelId(r.keeper) : "", e.target.value)}
                 >
                   <option>Proposed</option>
                   <option>Approved</option>

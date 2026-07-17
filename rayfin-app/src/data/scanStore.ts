@@ -240,3 +240,49 @@ async function pruneOld(userId: string): Promise<void> {
     await deleteScan(s.id).catch(() => undefined);
   }
 }
+
+// --- Consolidation decisions -----------------------------------------------------------------------
+// The human-in-the-loop status on a recommendation (Approved / In progress / Done). Persisted so the
+// decision survives refresh, tab switches, and re-scans, keyed by member_id (= the retired/redirected
+// model's modelId), so the same duplicate keeps its status across re-scans. See ScanDecision.ts.
+
+// Load every stored decision for this user as a { memberId -> status } map. "Proposed" is the implicit
+// default and is never stored, so an absent key means Proposed.
+export async function listDecisions(userId: string): Promise<Record<string, string>> {
+  const client = getRayfinClient();
+  const rows = (await client.data.ScanDecision
+    .select(["member_id", "status"])
+    .where({ user_id: { eq: userId } })
+    .first(1000)
+    .execute()) as unknown as { member_id: string; status: string }[];
+  const out: Record<string, string> = {};
+  for (const r of rows) out[r.member_id] = r.status;
+  return out;
+}
+
+// Upsert a decision by (user_id, member_id) via delete-then-create — avoids depending on the client's
+// update semantics and keeps the row unique. Resetting to "Proposed" (the default) just deletes the
+// row, so the table only ever holds real, actioned decisions.
+export async function setDecision(
+  userId: string,
+  memberId: string,
+  keeperId: string,
+  status: string,
+): Promise<void> {
+  const client = getRayfinClient();
+  const existing = (await client.data.ScanDecision
+    .select(["id"])
+    .where({ user_id: { eq: userId }, member_id: { eq: memberId } })
+    .first(50)
+    .execute()) as unknown as { id: string }[];
+  for (const e of existing) await client.data.ScanDecision.delete({ id: e.id }).catch(() => undefined);
+  if (status === "Proposed") return; // default state — leave no row
+  await client.data.ScanDecision.create({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    member_id: memberId,
+    keeper_id: keeperId,
+    status,
+    updated_at: new Date().toISOString(),
+  });
+}
