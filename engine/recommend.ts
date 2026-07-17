@@ -67,7 +67,12 @@ export function materialDrift(a: ModelCard, b: ModelCard): { drift: boolean; dim
   //    joins, so the numbers may not tie out. A pure subset/trimmed copy (member ⊆ keeper) has no
   //    member-only relationships, so containment alone is NOT flagged as drift (only genuine
   //    divergence is), which lets a trimmed copy be a clean redirect instead of a semantic-conflict.
-  if (a.relationships.length && b.relationships.length) {
+  //    Requires BOTH sides' relationships to be KNOWN: a Scanner-sourced card returns none (unknown),
+  //    so comparing against it would falsely read every member relationship as member-only. But when
+  //    the keeper is a full TMDL export that genuinely HAS no relationships, a member with joins the
+  //    keeper lacks IS real drift (previously masked by the old `&& b.relationships.length` gate).
+  const relKnown = (c: ModelCard): boolean => c.relationshipsKnown !== false;
+  if (a.relationships.length && relKnown(a) && relKnown(b)) {
     const keeperRels = new Set(b.relationships);
     if (a.relationships.some((r) => !keeperRels.has(r))) dims.push("relationship set differs");
   }

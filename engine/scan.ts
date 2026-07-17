@@ -8,7 +8,7 @@ import {
   scoreAll,
 } from "./index";
 import { recommendAll, type RecommendOptions } from "./recommend";
-import { joinUsage, type JoinReport } from "./usage";
+import { joinUsage, mergeUsage, type JoinReport } from "./usage";
 import {
   type Cluster,
   type ModelCard,
@@ -51,10 +51,11 @@ function computeCompositeLinks(cards: ModelCard[]): CompositeLink[] {
   const links: CompositeLink[] = [];
   for (const c of cards) {
     for (const up of c.derivedFrom ?? []) {
-      const matches = byName.get(up.trim().toLowerCase());
-      // Only resolve `to` when the name uniquely identifies one model in this scan. Two unrelated
-      // models sharing a name (e.g. cloned across workspaces) must not link to the wrong one —
-      // fall back to showing just the name (UI renders "source not in this scan").
+      const matches = byName.get(up.trim().toLowerCase())?.filter((m) => m !== c);
+      // Only resolve `to` when the name uniquely identifies one OTHER model in this scan. Two
+      // unrelated models sharing a name (e.g. cloned across workspaces) must not link to the wrong
+      // one, and a model whose derivedFrom names itself must not self-link — fall back to showing
+      // just the name (UI renders "source not in this scan").
       links.push({ from: c, toName: up, to: matches?.length === 1 ? matches[0] : undefined });
     }
   }
@@ -114,8 +115,19 @@ export function enrichScanWithUsage(
   records: Usage[],
   opts?: Partial<RecommendOptions>,
 ): ScanResult {
-  for (const c of scan.cards) c.usage = undefined; // reset so re-applying a different table is clean
+  // Preserve any usage the cards already carry (e.g. a Scanner scan's authoritative endorsement,
+  // owner, and downstream lineage) instead of destroying it: snapshot it, do a clean CSV join, then
+  // merge the CSV consumption ON TOP of the prior record where the card matched, or restore the prior
+  // record where the CSV didn't cover this card. A partial activity CSV must never silently drop a
+  // Certified model's governance metadata and flip it into a retirement candidate.
+  const prior = scan.cards.map((c) => c.usage);
+  for (const c of scan.cards) c.usage = undefined;
   const joinReport = joinUsage(scan.cards, records);
+  scan.cards.forEach((c, i) => {
+    const before = prior[i];
+    if (!before) return;
+    c.usage = c.usage ? mergeUsage(before, c.usage) : before;
+  });
   return { ...recommendScan(scan, opts), joinReport };
 }
 

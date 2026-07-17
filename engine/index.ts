@@ -250,8 +250,13 @@ export function findPromotionChains(cards: ModelCard[], pairs: PairResult[]): Pr
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k)!.push(c);
   }
+  // Use the blended headline (measures + schema + source + relationships), not the measure facet
+  // alone: measure-only drift falsely brands two identical MEASURELESS lifecycle models (e.g. default
+  // Lakehouse models, where the measure facet is 0) as "drift detected", and conversely misses real
+  // structural drift (a relationship or source that changed between dev and prod while measures stayed
+  // identical). The headline reflects both.
   const simLookup = new Map<string, number>();
-  for (const p of pairs) simLookup.set([modelId(p.a), modelId(p.b)].sort().join("|"), p.facets.measure);
+  for (const p of pairs) simLookup.set([modelId(p.a), modelId(p.b)].sort().join("|"), p.headline);
 
   const chains: PromotionChain[] = [];
   for (const [k, members] of groups) {

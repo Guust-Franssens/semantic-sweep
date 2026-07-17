@@ -156,3 +156,22 @@ deferred LSH blocking stage.
 - `models/` and `out/` are gitignored: they hold real tenant metadata.
 - MVP is **pure stdlib** (no embeddings/numpy) for portability; deferred enhancements include
   LSH blocking, embeddings, Hungarian matching, and a deployment-pipeline API.
+
+## Known limitations (v1)
+Surfaced by a multi-model engine review and consciously deferred; none affect the common workflow,
+but worth knowing:
+- **Scale.** Pair scoring is O(n²) (LSH blocking is deferred). Comfortable into the low hundreds of
+  models; a whole tenant with thousands needs the blocking stage first.
+- **DAX similarity is lexical, not AST-based.** It compares weighted DAX features plus a structural
+  skeleton, so it can score reordered arithmetic (`(A+B)*C` vs `A+(B*C)`) as identical, and two
+  unrelated simple aggregations (`SUM` over different tables) can surface for review. The
+  strong/exact-clone bands are gated by ref-backed evidence to contain this, so these show up as
+  "needs review", not as confident duplicates.
+- **Usage/metadata CSV parsing assumes invariant (US/ISO) formats.** European decimal commas
+  (`1,5`) and day-first dates (`15/01/2024`) may misparse. Prefer ISO 8601 dates and a period
+  decimal, or use the admin-scan path, which needs no CSV.
+- **Internationalized model names.** Lifecycle name-normalization is ASCII-oriented; purely non-ASCII
+  (e.g. CJK) model names can collapse together when grouping promotion chains.
+- **Admin-scan source fingerprinting.** File-path / URL physical sources and commented-out M are not
+  fully fingerprinted on the Scanner path; relationships are not returned by the Scanner at all (so
+  that facet deactivates rather than guessing).

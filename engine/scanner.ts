@@ -153,6 +153,7 @@ export function scannerToModels(body: ScanResultBody): ModelCard[] {
         columns,
         measures,
         relationships: [], // Scanner does not return relationships
+        relationshipsKnown: false, // ...so its empty list is "unknown", not "known to have none"
         sourceLogical: new Set<string>(),
         sourcePhysical,
         hasRls: (ds.roles?.length ?? 0) > 0,

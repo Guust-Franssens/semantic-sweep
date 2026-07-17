@@ -257,6 +257,10 @@ export function joinUsage(cards: ModelCard[], records: Usage[]): JoinReport {
       if (hits && hits.length === 1) {
         match = hits[0];
         tier = "high";
+      } else if (hits && hits.length > 1) {
+        ambiguous++; // same GUID on multiple CSV rows = inconsistent export; don't guess a weaker tier
+        unmatchedCards.push(card);
+        continue;
       }
     }
     if (!match) {
@@ -272,16 +276,21 @@ export function joinUsage(cards: ModelCard[], records: Usage[]): JoinReport {
     }
     if (!match) {
       const hits = byName.get(norm(card.name));
-      if (hits && hits.length === 1) {
+      // Guard against attaching one record to several same-named cards: once a record is claimed,
+      // a second card with the same name falls through to unmatched rather than sharing it.
+      if (hits && hits.length === 1 && !usedRecords.has(hits[0])) {
         match = hits[0];
         tier = "low";
+      } else if (hits && hits.length > 1) {
+        ambiguous++; // several CSV rows share this name — a name-only guess is unsafe
       }
     }
 
     if (match) {
-      match.joinConfidence = tier;
-      card.usage = match;
       usedRecords.add(match);
+      // Clone per card: never share (or mutate) one Usage object across cards, which would
+      // double-count savings and let one card's joinConfidence overwrite another's.
+      card.usage = { ...match, joinConfidence: tier };
       byTier[tier]++;
       matched++;
     } else {
@@ -291,4 +300,20 @@ export function joinUsage(cards: ModelCard[], records: Usage[]): JoinReport {
 
   const unmatchedRecords = records.filter((u) => !usedRecords.has(u));
   return { matched, byTier, ambiguous, unmatchedCards, unmatchedRecords };
+}
+
+// Merge an overlay usage record onto a base one (e.g. a CSV consumption table layered over a Scanner
+// scan's governance/lineage). The overlay wins per-field WHERE it actually has a value; the base fills
+// every gap the overlay left blank; identity confidence is the stronger of the two joins. This stops a
+// partial CSV overlay from silently erasing Scanner-authoritative endorsement, owner, and lineage.
+export function mergeUsage(base: Usage, overlay: Usage): Usage {
+  const merged: Usage = { ...base };
+  for (const key of Object.keys(overlay) as (keyof Usage)[]) {
+    if (key === "joinConfidence") continue;
+    const v = overlay[key];
+    if (v !== undefined) (merged as unknown as Record<string, unknown>)[key] = v;
+  }
+  merged.joinConfidence =
+    joinScore[base.joinConfidence] >= joinScore[overlay.joinConfidence] ? base.joinConfidence : overlay.joinConfidence;
+  return merged;
 }

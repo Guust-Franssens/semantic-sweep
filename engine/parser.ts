@@ -276,6 +276,7 @@ function parseModel(mf: ModelFiles): ModelCard {
     columns: [],
     measures: [],
     relationships: [],
+    relationshipsKnown: true, // TMDL export knows relationships definitively
     sourceLogical: new Set(),
     sourcePhysical: new Set(),
     hasRls: false,

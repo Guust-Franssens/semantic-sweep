@@ -20,6 +20,12 @@ export interface ModelCard {
   columns: Column[];
   measures: Measure[];
   relationships: string[]; // "from\u0000to" normalized edges
+  // Whether `relationships` is a KNOWN-complete list. A TMDL parse knows relationships definitively
+  // (true); a Scanner-API card never returns them, so its empty array is "unknown" (false), NOT
+  // "known to have none". Drift comparison must treat an unknown side as "can't tell" rather than
+  // reading the other side's relationships as all member-only — see recommend.ts materialDrift().
+  // `undefined` is treated as known (TMDL/test default) for backward compatibility.
+  relationshipsKnown?: boolean;
   sourceLogical: Set<string>; // "schema\u0000entity"
   sourcePhysical: Set<string>; // "endpoint\u0000db"
   hasRls: boolean;
