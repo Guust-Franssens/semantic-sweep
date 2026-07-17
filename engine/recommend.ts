@@ -165,12 +165,12 @@ function recommendMember(
 
   if (drift.drift) {
     action = "semantic-conflict";
-    reasonCodes.push("does not tie out to the keeper — resolve source of truth");
+    reasonCodes.push("does not tie out to the keeper; resolve source of truth");
     if (u?.modifiedDate) reasonCodes.push(`this copy modified ${u.modifiedDate}`);
     blockers.push(...drift.dims);
   } else if (!u || idJoin < joinScore.medium) {
     action = "insufficient-evidence";
-    reasonCodes.push(u ? `identity join weak (${u.joinConfidence}) — confirm before acting` : "no usage/metadata matched this model");
+    reasonCodes.push(u ? `identity join weak (${u.joinConfidence}); confirm before acting` : "no usage/metadata matched this model");
   } else if (u.endorsement === "Certified") {
     action = "governance-conflict";
     reasonCodes.push(keeper.usage?.endorsement === "Certified" ? "two certified copies" : "certified duplicate");
@@ -182,18 +182,18 @@ function recommendMember(
 
     if (!consumptionKnown) {
       action = "insufficient-evidence";
-      reasonCodes.push("no consumption data — unknown usage risk");
+      reasonCodes.push("no consumption data; unknown usage risk");
     } else if (hasAudience) {
       action = "merge";
-      reasonCodes.push(`${u.distinctUsers90d ?? "?"} users / ${u.views90d ?? "?"} views in 90d — has an audience`);
+      reasonCodes.push(`${u.distinctUsers90d ?? "?"} users / ${u.views90d ?? "?"} views in 90d; has an audience`);
       blockers.push("redirect reports/users to keeper (report rebind)");
       if (member.hasRls) blockers.push("RLS / permission migration");
     } else if (unused90 && daysAccess != null && daysAccess < opts.candidateDays) {
       action = "insufficient-evidence"; // dormant but used within the year (e.g. quarterly) — protect
-      reasonCodes.push(`0 users in 90d, but last activity ${daysAccess}d ago (<${opts.candidateDays}d) — investigate, don't retire`);
+      reasonCodes.push(`0 users in 90d, but last activity ${daysAccess}d ago (<${opts.candidateDays}d); investigate, don't retire`);
     } else if (unused90 && !lineageKnown) {
       action = "insufficient-evidence";
-      reasonCodes.push("0 users in 90d but no downstream lineage — unknown usage risk");
+      reasonCodes.push("0 users in 90d but no downstream lineage; unknown usage risk");
     } else if (unused90 && (u.downstreamReportCount ?? 0) > 0) {
       action = "retirement-candidate-blocked";
       reasonCodes.push(`0 users / 0 views in 90d; dormant ${daysAccess ?? "?"}d`);
@@ -234,7 +234,7 @@ export function recommendCluster(cluster: Cluster, opts?: Partial<RecommendOptio
   const recs = cluster.members.filter((m) => m !== keeper).map((m) => recommendMember(m, keeper, simTo.get(m), o));
   const anyDrift = recs.some((r) => r.action === "semantic-conflict");
   cluster.usageKeeper = keeper;
-  cluster.keeperBasis = anyDrift ? `${basis} — proposed; drift detected, confirm source of truth` : basis;
+  cluster.keeperBasis = anyDrift ? `${basis} (proposed: drift detected, confirm source of truth)` : basis;
   cluster.recommendations = recs;
   return recs;
 }
@@ -248,7 +248,7 @@ export function recommendAll(clusters: Cluster[], opts?: Partial<RecommendOption
 
 export const REC_LABELS: Record<RecAction, string> = {
   "retirement-candidate": "Retirement candidate",
-  "retirement-candidate-blocked": "Retire — blocked by downstream",
+  "retirement-candidate-blocked": "Retire (blocked by downstream)",
   merge: "Merge & redirect",
   "governance-conflict": "Governance conflict",
   "semantic-conflict": "Semantic conflict",
