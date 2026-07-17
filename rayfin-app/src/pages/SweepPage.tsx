@@ -552,6 +552,15 @@ export function SweepPage() {
 
   const usageOn = !!(scan.usageLoaded && scan.recommendations);
   const retire = usageOn ? scan.recommendations!.filter((r) => r.action === "retirement-candidate").length : 0;
+  // Whether any joined usage row actually carries consumption telemetry (users/views). An admin scan
+  // joins metadata + identity but usually no consumption, which is exactly why retirement candidates
+  // can legitimately be 0: the engine won't call a model "unused" without proof. Detect that so the
+  // hero card can explain the 0 rather than leaving it a mystery.
+  const consumptionKnown =
+    usageOn &&
+    scan.recommendations!.some(
+      (r) => r.member.usage != null && (r.member.usage.distinctUsers90d != null || r.member.usage.views90d != null),
+    );
   const s = {
     models: scan.cards.length,
     pairs: scan.pairs.length,
@@ -589,7 +598,18 @@ export function SweepPage() {
         <StatCard icon={Layers} value={s.clusters} label="Duplicate clusters" tint="#0f6cbd" accent />
         <StatCard icon={ClipboardList} value={s.review} label="Needs review" tint="#bc4b09" accent />
         {usageOn ? (
-          <StatCard icon={Trash2} value={retire} label="Retirement candidates" tint="#0e700e" accent />
+          <StatCard
+            icon={Trash2}
+            value={retire}
+            label="Retirement candidates"
+            tint="#0e700e"
+            accent
+            title={
+              retire === 0 && !consumptionKnown
+                ? "0 because this scan has no consumption data (users/views). Load a usage table with consumption on the Connect data tab to unlock retirement calls."
+                : "Duplicates that are also unused and evidence-backed: safe to retire."
+            }
+          />
         ) : (
           <StatCard icon={GitBranch} value={s.chains} label="Promotion chains" tint="#8764b8" />
         )}

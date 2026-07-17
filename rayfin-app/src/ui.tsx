@@ -7,9 +7,9 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-export function Card({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
+export function Card({ children, className, style, title }: { children: ReactNode; className?: string; style?: CSSProperties; title?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card text-card-foreground", className)} style={style}>
+    <div className={cn("rounded-2xl border border-border bg-card text-card-foreground", className)} style={style} title={title}>
       {children}
     </div>
   );
@@ -27,6 +27,7 @@ export function StatCard({
   sub,
   tint = "#0f6cbd",
   accent,
+  title,
 }: {
   icon: LucideIcon;
   value: ReactNode;
@@ -34,9 +35,14 @@ export function StatCard({
   sub?: string;
   tint?: string;
   accent?: boolean;
+  title?: string;
 }) {
+  // A zero value is a real, honest state (e.g. "0 retirement candidates" on an admin scan with no
+  // consumption data), but painting it in the bold accent tint makes it shout like a headline metric.
+  // Mute a zero so it reads calmly as "none" instead.
+  const isZero = value === 0;
   return (
-    <Card className="p-[14px]">
+    <Card className="p-[14px]" title={title}>
       <div className="flex items-start gap-[11px]">
         <span
           className="flex items-center justify-center rounded-lg"
@@ -45,7 +51,10 @@ export function StatCard({
           <Icon size={18} />
         </span>
         <div className="min-w-0">
-          <div className="text-[24px] font-bold leading-none" style={accent ? { color: tint } : undefined}>
+          <div
+            className={cn("text-[24px] font-bold leading-none", isZero && "text-muted-foreground/60")}
+            style={accent && !isZero ? { color: tint } : undefined}
+          >
             {value}
           </div>
           <div className="mt-[5px] text-[12.5px] font-semibold text-foreground">{label}</div>
