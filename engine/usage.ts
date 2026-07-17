@@ -147,8 +147,14 @@ const asStr = (v: string | undefined): string | undefined => {
 };
 
 const asNum = (v: string | undefined): number | undefined => {
-  if (v == null) return undefined;
-  const n = Number(v.replace(/[, ]/g, ""));
+  // A blank / whitespace-only cell is MISSING data, not zero. Number("") is 0 in JS, which would
+  // silently turn an unknown users/views/downstream-reports count into a hard 0 — enough for
+  // recommend.ts to (wrongly) classify the model as "unused" and surface a confident retirement
+  // candidate from what is actually absent evidence. Treat empty as undefined so the
+  // insufficient-evidence path catches it.
+  const s = v?.trim();
+  if (!s) return undefined;
+  const n = Number(s.replace(/[, ]/g, ""));
   return Number.isFinite(n) ? n : undefined;
 };
 

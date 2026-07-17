@@ -46,12 +46,18 @@ export const DRIFT_COVERAGE = [
 export function materialDrift(a: ModelCard, b: ModelCard): { drift: boolean; dims: string[] } {
   const dims: string[] = [];
 
-  // 1. Same measure NAME on both sides but different DAX — the classic "won't tie out".
+  // 1. Same measure NAME on both sides but different DAX — the classic "won't tie out". Skip any
+  // measure whose DAX is absent on EITHER side: an admin Scanner scan withholds expressions (dax
+  // ""), so comparing a withheld "" against a real expression would flag every shared measure as a
+  // conflict and turn genuine duplicates into false "semantic-conflict" recs. Only real-vs-real
+  // divergence is drift (mirrors matchModelMeasures' empty-DAX filter).
   const bDax = new Map(b.measures.map((m) => [m.name.toLowerCase(), normalizeDax(m.dax)]));
   const conflicting: string[] = [];
   for (const m of a.measures) {
+    const aNorm = normalizeDax(m.dax);
+    if (aNorm === "") continue; // this side's DAX withheld/absent — can't tell
     const other = bDax.get(m.name.toLowerCase());
-    if (other != null && other !== normalizeDax(m.dax)) conflicting.push(m.name);
+    if (other != null && other !== "" && other !== aNorm) conflicting.push(m.name);
   }
   if (conflicting.length) {
     dims.push(`measure logic differs: ${conflicting.slice(0, 4).join(", ")}${conflicting.length > 4 ? "…" : ""}`);
