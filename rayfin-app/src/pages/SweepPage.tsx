@@ -550,6 +550,16 @@ export function SweepPage() {
     });
   }, [scan, activeBands, search]);
 
+  // O(1) lookup of the scored pair for a (member, keeper) recommendation, so the worklist can open
+  // the WhyDrawer (with the DAX diff) for the exact pair a conflict describes.
+  const pairIndex = useMemo(() => {
+    const m = new Map<string, PairResult>();
+    for (const p of scan.pairs) m.set([modelId(p.a), modelId(p.b)].sort().join("|"), p);
+    return m;
+  }, [scan]);
+  const pairFor = (a: ModelCard, b: ModelCard | null): PairResult | undefined =>
+    b ? pairIndex.get([modelId(a), modelId(b)].sort().join("|")) : undefined;
+
   const usageOn = !!(scan.usageLoaded && scan.recommendations);
   const retire = usageOn ? scan.recommendations!.filter((r) => r.action === "retirement-candidate").length : 0;
   // Whether any joined usage row actually carries consumption telemetry (users/views). An admin scan
@@ -774,7 +784,7 @@ export function SweepPage() {
                   <ViewHeader title="Consolidation worklist" subtitle="Cross-team models computing the same thing. With usage fused, each becomes a ranked, evidence-backed call: a human confirms." />
                   {usageOn && scan.recommendations && (
                     <div className="mb-[24px]">
-                      <Worklist recs={scan.recommendations} onModel={setModel} decisions={decisions} onDecision={onDecision} />
+                      <Worklist recs={scan.recommendations} onModel={setModel} decisions={decisions} onDecision={onDecision} onWhy={setWhy} pairFor={pairFor} />
                     </div>
                   )}
                   <h2 className="mb-[8px] text-[15px] font-bold text-foreground">Duplicate clusters</h2>

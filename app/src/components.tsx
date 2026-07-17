@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Cluster, ModelCard, PairResult, PromotionChain, RecAction, Recommendation } from "@engine/types";
 import { fabricModelUrl, modelId } from "@engine/types";
 import { REC_LABELS } from "@engine/recommend";
+import { normalizeDax } from "@engine/measures";
 import { BAND_META, bandColor, bandLabel } from "./bands";
 import { diffDax, type DiffToken } from "./daxDiff";
 import { useFocusTrap } from "./useFocusTrap";
@@ -66,7 +67,19 @@ export function UsageSummary({ recs }: { recs: Recommendation[] }) {
   );
 }
 
-export function Worklist({ recs, onModel }: { recs: Recommendation[]; onModel: (c: ModelCard) => void }) {
+export function Worklist({
+  recs,
+  onModel,
+  onWhy,
+  pairFor,
+}: {
+  recs: Recommendation[];
+  onModel: (c: ModelCard) => void;
+  // Opens the WhyDrawer (facet breakdown + matched measures + red/green DAX diff) for a rec's
+  // member<->keeper pair, so the evidence behind "measure logic differs" is one click away.
+  onWhy?: (p: PairResult) => void;
+  pairFor?: (member: ModelCard, keeper: ModelCard | null) => PairResult | undefined;
+}) {
   const [status, setStatus] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   if (recs.length === 0) {
@@ -99,6 +112,7 @@ export function Worklist({ recs, onModel }: { recs: Recommendation[]; onModel: (
         {shown.map((r, i) => {
           const meta = REC_META[r.action];
           const id = modelId(r.member);
+          const pair = pairFor?.(r.member, r.keeper);
           return (
             <div className="rec-card" key={i}>
               <div className="rec-head">
@@ -140,6 +154,18 @@ export function Worklist({ recs, onModel }: { recs: Recommendation[]; onModel: (
                   join {JOIN_LABEL[r.member.usage?.joinConfidence ?? "none"]} · usage {r.confidence.usageLineage.toFixed(2)}
                 </span>
                 {r.member.usage?.configuredBy && <span className="rec-owner">{r.member.usage.configuredBy}</span>}
+                {pair && onWhy && (
+                  <>
+                    <span className="rec-spacer" />
+                    <button
+                      className="why-btn"
+                      onClick={() => onWhy(pair)}
+                      title="See the evidence: facet breakdown, matched measures, and the DAX diff"
+                    >
+                      why?
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           );
@@ -522,7 +548,33 @@ function DaxDiffPre({ tokens }: { tokens: DiffToken[] }) {
 export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
   const daxA = new Map(pair.a.measures.map((m) => [m.name, m.dax]));
   const daxB = new Map(pair.b.measures.map((m) => [m.name, m.dax]));
-  const drift = pair.measure.matched.filter((m) => m.score < 0.999);
+  // Build one list of DAX differences to show, from two sources, deduped by the (a,b) name pair:
+  //  1. Same-name measures whose logic differs — the "measure logic differs: X" conflict drivers.
+  //     These often do NOT appear in the matcher's matched[] set (their DAX diverged too far to pair),
+  //     so without this the very measure a conflict names would show no diff at all.
+  //  2. Matched-but-not-identical measures (e.g. a renamed near-copy) that the matcher did pair.
+  const aByName = new Map(pair.a.measures.map((m) => [m.name.toLowerCase(), m] as const));
+  const diffEntries: Array<{ title: string; sub?: string; aDax: string; bDax: string }> = [];
+  const seen = new Set<string>();
+  for (const mb of pair.b.measures) {
+    const ma = aByName.get(mb.name.toLowerCase());
+    if (!ma || !(ma.dax ?? "").trim() || !(mb.dax ?? "").trim()) continue;
+    if (normalizeDax(ma.dax) === normalizeDax(mb.dax)) continue;
+    seen.add(`${ma.name.toLowerCase()}|${mb.name.toLowerCase()}`);
+    diffEntries.push({ title: mb.name, aDax: ma.dax, bDax: mb.dax });
+  }
+  for (const m of pair.measure.matched) {
+    if (m.score >= 0.999) continue;
+    const key = `${m.a.toLowerCase()}|${m.b.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    diffEntries.push({
+      title: m.a === m.b ? m.a : `${m.a} vs ${m.b}`,
+      sub: `(${m.score.toFixed(2)})`,
+      aDax: daxA.get(m.a) ?? "",
+      bDax: daxB.get(m.b) ?? "",
+    });
+  }
   const drawerRef = useFocusTrap<HTMLDivElement>(onClose);
 
   return (
@@ -584,19 +636,18 @@ export function WhyDrawer({ pair, labels, onClose }: DrawerProps) {
           ))}
         </div>
 
-        {drift.length > 0 && (
+        {diffEntries.length > 0 && (
           <div style={{ marginTop: 14 }}>
             <div className="tag">
-              DAX differences (matched but not identical): <span className="dax-del">red</span> = only on the left,{" "}
+              DAX differences: <span className="dax-del">red</span> = only on the left,{" "}
               <span className="dax-add">green</span> = only on the right.
             </div>
-            {drift.slice(0, 6).map((m, i) => {
-              const d = diffDax(daxA.get(m.a) ?? "", daxB.get(m.b) ?? "");
+            {diffEntries.slice(0, 8).map((e, i) => {
+              const d = diffDax(e.aDax, e.bDax);
               return (
                 <div key={i}>
                   <div style={{ fontSize: 12, margin: "8px 0 2px" }}>
-                    <code>{m.a}</code> {m.a !== m.b && <>vs <code>{m.b}</code></>}{" "}
-                    <span className="tag">({m.score.toFixed(2)})</span>
+                    <code>{e.title}</code> {e.sub && <span className="tag">{e.sub}</span>}
                   </div>
                   <div className="daxdiff">
                     <DaxDiffPre tokens={d.a} />

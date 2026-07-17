@@ -125,6 +125,16 @@ export function App() {
     });
   }, [scan, activeBands, search]);
 
+  // O(1) lookup of the scored pair for a (member, keeper) recommendation, so the worklist can open
+  // the WhyDrawer (with the DAX diff) for the exact pair a conflict describes.
+  const pairIndex = useMemo(() => {
+    const m = new Map<string, PairResult>();
+    for (const p of scan.pairs) m.set([modelId(p.a), modelId(p.b)].sort().join("|"), p);
+    return m;
+  }, [scan]);
+  const pairFor = (a: ModelCard, b: ModelCard | null): PairResult | undefined =>
+    b ? pairIndex.get([modelId(a), modelId(b)].sort().join("|")) : undefined;
+
   const s = {
     models: scan.cards.length,
     pairs: scan.pairs.length,
@@ -188,7 +198,7 @@ export function App() {
               Similarity fused with usage &amp; freshness → ranked, evidence-backed recommendations. Set a status;
               confirm before acting. Drift or a weak identity join blocks a "retire" call.
             </p>
-            <Worklist recs={scan.recommendations} onModel={setModel} />
+            <Worklist recs={scan.recommendations} onModel={setModel} onWhy={setWhy} pairFor={pairFor} />
           </>
         )}
 
